@@ -1,0 +1,39 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "options": {
+                "shell": {
+                    "executable": "C:\\msys64\\usr\\bin\\bash.exe",
+                    "args": [
+                        "--login",
+                        "-c"
+                    ]
+                },
+                "env": {
+                    "MSYSTEM": "ucrt64",
+                    "CHERE_INVOKING": "1"
+                }
+            },
+            "label": "Make",
+            "type": "shell",
+            "command": "make",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true,
+                "echo": false,
+                "showReuseMessage": false,
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}

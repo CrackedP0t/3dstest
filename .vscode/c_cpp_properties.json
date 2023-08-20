@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "name": "3DS",
+            "includePath": [
+                "${workspaceFolder}\\**",
+                "C:\\msys64\\opt\\devkitPro\\libctru\\include\\**",
+                "C:\\msys64\\opt\\devkitPro\\devkitARM\\include\\**",
+                "C:\\msys64\\opt\\devkitPro\\devkitARM\\arm-none-eabi\\include\\**"
+            ],
+            "compilerPath": "C:\\msys64\\opt\\devkitPro\\devkitARM\\bin\\arm-none-eabi-gcc.exe",
+            "cppStandard": "gnu++11",
+            "intelliSenseMode": "windows-gcc-arm",
+            "defines": [
+                "ARM11",
+                "__3DS__"
+            ],
+            "cStandard": "gnu11"
+        }
+    ],
+    "version": 4
+}

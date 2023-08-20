@@ -1,0 +1,21 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+        "type": "gdb",
+        "request": "attach",
+        "name": "Attach to gdbserver",
+        "executable": "${workspaceRoot}/2dgame.elf",
+        "target": "192.168.47.75:4000",
+        "remote": true,
+        "cwd": "${workspaceRoot}", 
+        "gdbpath": "C:\\msys64\\opt\\devkitpro\\devkitARM\\bin\\arm-none-eabi-gdb.exe",
+        "stopAtConnect": true,
+        "autorun": [
+            ]
+    }        
+    ]
+}
