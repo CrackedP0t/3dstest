@@ -12,87 +12,16 @@
 	 GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
 	 GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-typedef struct
-{
-	float position[3];
-	float texcoord[2];
-	float normal[3];
-} vertex;
-
-static const vertex vertex_list[] =
-	{
-		// First face (PZ)
-		// First triangle
-		{{-0.5f, -0.5f, +0.5f}, {0.0f, 0.0f}, {0.0f, 0.0f, +1.0f}},
-		{{+0.5f, -0.5f, +0.5f}, {1.0f, 0.0f}, {0.0f, 0.0f, +1.0f}},
-		{{+0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {0.0f, 0.0f, +1.0f}},
-		// Second triangle
-		{{+0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {0.0f, 0.0f, +1.0f}},
-		{{-0.5f, +0.5f, +0.5f}, {0.0f, 1.0f}, {0.0f, 0.0f, +1.0f}},
-		{{-0.5f, -0.5f, +0.5f}, {0.0f, 0.0f}, {0.0f, 0.0f, +1.0f}},
-
-		// Second face (MZ)
-		// First triangle
-		{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-		{{-0.5f, +0.5f, -0.5f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-		{{+0.5f, +0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
-		// Second triangle
-		{{+0.5f, +0.5f, -0.5f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
-		{{+0.5f, -0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f}},
-		{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}},
-
-		// Third face (PX)
-		// First triangle
-		{{+0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {+1.0f, 0.0f, 0.0f}},
-		{{+0.5f, +0.5f, -0.5f}, {1.0f, 0.0f}, {+1.0f, 0.0f, 0.0f}},
-		{{+0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {+1.0f, 0.0f, 0.0f}},
-		// Second triangle
-		{{+0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {+1.0f, 0.0f, 0.0f}},
-		{{+0.5f, -0.5f, +0.5f}, {0.0f, 1.0f}, {+1.0f, 0.0f, 0.0f}},
-		{{+0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {+1.0f, 0.0f, 0.0f}},
-
-		// Fourth face (MX)
-		// First triangle
-		{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
-		{{-0.5f, -0.5f, +0.5f}, {1.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
-		{{-0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
-		// Second triangle
-		{{-0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
-		{{-0.5f, +0.5f, -0.5f}, {0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}},
-		{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}},
-
-		// Fifth face (PY)
-		// First triangle
-		{{-0.5f, +0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f, +1.0f, 0.0f}},
-		{{-0.5f, +0.5f, +0.5f}, {1.0f, 0.0f}, {0.0f, +1.0f, 0.0f}},
-		{{+0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {0.0f, +1.0f, 0.0f}},
-		// Second triangle
-		{{+0.5f, +0.5f, +0.5f}, {1.0f, 1.0f}, {0.0f, +1.0f, 0.0f}},
-		{{+0.5f, +0.5f, -0.5f}, {0.0f, 1.0f}, {0.0f, +1.0f, 0.0f}},
-		{{-0.5f, +0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f, +1.0f, 0.0f}},
-
-		// Sixth face (MY)
-		// First triangle
-		{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
-		{{+0.5f, -0.5f, -0.5f}, {1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
-		{{+0.5f, -0.5f, +0.5f}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
-		// Second triangle
-		{{+0.5f, -0.5f, +0.5f}, {1.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
-		{{-0.5f, -0.5f, +0.5f}, {0.0f, 1.0f}, {0.0f, -1.0f, 0.0f}},
-		{{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}},
-};
-
-#define vertex_list_count (sizeof(vertex_list) / sizeof(vertex_list[0]))
+typedef float vertex[3];
 
 static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
-static int uLoc_projection, uLoc_modelView;
+static int uLoc_projection;
 static int uLoc_tint;
 static C3D_Mtx projection;
 
 static void *vbo_data;
 static C3D_Tex kitten_tex;
-static float angleX = 0.0, angleY = 0.0;
 
 // Helper function for loading a texture from memory
 static bool loadTextureFromMem(C3D_Tex *tex, C3D_TexCube *cube, const void *data, size_t size)
@@ -106,6 +35,19 @@ static bool loadTextureFromMem(C3D_Tex *tex, C3D_TexCube *cube, const void *data
 	return true;
 }
 
+void add_rect(vertex * dest, float x, float y, float width, float height) {
+	vertex vertex_list[] = {
+		{x, y},
+		{x + width, y},
+		{x, y + height},
+		{x, y + height},
+		{x + width, y},
+		{x + width, y + height}
+	};
+
+	memcpy(dest, vertex_list, sizeof(vertex_list));
+}
+
 static void sceneInit(void)
 {
 	// Load the vertex shader, create a shader program and bind it
@@ -116,30 +58,25 @@ static void sceneInit(void)
 
 	// Get the location of the uniforms
 	uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
-	uLoc_modelView = shaderInstanceGetUniformLocation(program.vertexShader, "modelView");
 	uLoc_tint = shaderInstanceGetUniformLocation(program.vertexShader, "tint");
 
 	// Configure attributes for use with the vertex shader
 	C3D_AttrInfo *attrInfo = C3D_GetAttrInfo();
 	AttrInfo_Init(attrInfo);
 	AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0=position
-	AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2); // v1=texcoord
-	AttrInfo_AddLoader(attrInfo, 2, GPU_FLOAT, 3); // v2=normal
-
-	const float scale = 2.0;
 
 	// Compute the projection matrix
-	// Mtx_OrthoTilt(&projection, -scale, scale, -scale / C3D_AspectRatioTop, scale / C3D_AspectRatioTop, 0.01, 1000.0, false);
-	Mtx_PerspTilt(&projection, C3D_AngleFromDegrees(80.0f), C3D_AspectRatioTop, 0.01f, 1000.0f, false);
+	 Mtx_OrthoTilt(&projection, 0, 400.0, 0.0, 240.0, 0.0, 1000.0, true);
 
 	// Create the VBO (vertex buffer object)
-	vbo_data = linearAlloc(sizeof(vertex_list));
-	memcpy(vbo_data, vertex_list, sizeof(vertex_list));
+	vbo_data = linearAlloc(20 * sizeof(vertex));
+
+	add_rect(vbo_data, 1.0, 1.0, 2000, 2000);
 
 	// Configure buffers
 	C3D_BufInfo *bufInfo = C3D_GetBufInfo();
 	BufInfo_Init(bufInfo);
-	BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 3, 0x210);
+	BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 1, 0x0);
 
 	// Load the texture and bind it to the first texture unit
 	if (!loadTextureFromMem(&kitten_tex, NULL, kitten_t3x, kitten_t3x_size))
@@ -151,30 +88,22 @@ static void sceneInit(void)
 	// See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
 	C3D_TexEnv *env = C3D_GetTexEnv(0);
 	C3D_TexEnvInit(env);
-	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, 0);
-	C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
+	C3D_TexEnvSrc(env, C3D_Both, GPU_PRIMARY_COLOR, 0, 0);
+	C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
+}
+
+void printvec(C3D_FVec v) {
+	printf("(%f, %f, %f, %f)\n", v.x, v.y, v.z, v.w);
 }
 
 static void sceneRender(void)
 {
-	// Calculate the modelView matrix
-	C3D_Mtx modelView;
-	Mtx_Identity(&modelView);
-	Mtx_Translate(&modelView, 0.0, 0.0, -2.0 + 0.5 * sinf(angleX), true);
-	Mtx_RotateX(&modelView, angleX, true);
-	Mtx_RotateY(&modelView, angleY, true);
-
-	// Rotate the cube each frame
-	angleX += M_PI / 180;
-	angleY += M_PI / 360;
-
 	// Update the uniforms
 	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
-	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_modelView, &modelView);
-	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_tint, 1.0f, 1.0f, 1.0f, 0.5 + 0.5 * sinf(angleX)); 
+	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_tint, 1.0f, 1.0f, 1.0f, 1.0f);
 
 	// Draw the VBO
-	C3D_DrawArrays(GPU_TRIANGLES, 0, vertex_list_count);
+	C3D_DrawArrays(GPU_TRIANGLES, 0, 6 * sizeof(vertex));
 }
 
 static void sceneExit(void)
