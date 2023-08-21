@@ -38,11 +38,13 @@ static int uLoc_tint;
 static C3D_Mtx projection;
 
 static vertex *vbo_data;
-static C3D_Tex raysQ_tex;
+static C3D_Tex texture;
 
 #define MAX_SPRITES (15000)
-#define SPRITE_HEIGHT (50.0f)
-#define SPRITE_WIDTH (50.0f)
+#define SPRITE_HEIGHT (25.0f)
+#define SPRITE_WIDTH (25.0f)
+#define ORIGINAL_WIDTH (112.0)
+#define ORIGINAL_HEIGHT (112.0)
 
 static int current_sprites = 2000;
 static spriteinfo sprites[MAX_SPRITES];
@@ -64,13 +66,16 @@ float randbetween(float min, float max) {
 }
 
 void add_rect(vertex * dest, float x, float y, float width, float height) {
+	float u =  (float)ORIGINAL_WIDTH / (float)texture.width;
+	float v =  1.0 - (float)ORIGINAL_HEIGHT / (float)texture.height;
+
 	vertex vertex_list[] = {
 		{{x, y, 1.0}, {0.0, 1.0}},
-		{{x + width, y, 1.0}, {1.0, 1.0}},
-		{{x, y + height, 1.0}, {0.0, 0.0}},
-		{{x, y + height, 1.0}, {0.0, 0.0}},
-		{{x + width, y, 1.0}, {1.0, 1.0}},
-		{{x + width, y + height, 1.0}, {1.0, 0.0}},
+		{{x + width, y, 1.0}, {u, 1.0}},
+		{{x, y + height, 1.0}, {0.0, v}},
+		{{x, y + height, 1.0}, {0.0, v}},
+		{{x + width, y, 1.0}, {u, 1.0}},
+		{{x + width, y + height, 1.0}, {u, v}},
 	};
 
 	memcpy(dest, vertex_list, sizeof(vertex_list));
@@ -96,6 +101,11 @@ static void sceneInit(void)
 
 	// Compute the projection matrix
 	 Mtx_OrthoTilt(&projection, 0, 400.0, 240, 0, 0.0, 1.0, true);
+	 
+
+	// Load the texture and bind it to the first texture unit
+	if (!loadTextureFromMem(&texture, NULL, raysQ_t3x, raysQ_t3x_size))
+		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
 	vbo_data = linearAlloc(MAX_SPRITES * 6 * sizeof(vertex));
@@ -118,11 +128,9 @@ static void sceneInit(void)
 	BufInfo_Init(bufInfo);
 	BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 2, 0x10);
 
-	// Load the texture and bind it to the first texture unit
-	if (!loadTextureFromMem(&raysQ_tex, NULL, raysQ_t3x, raysQ_t3x_size))
-		svcBreak(USERBREAK_PANIC);
-	C3D_TexSetFilter(&raysQ_tex, GPU_LINEAR, GPU_NEAREST);
-	C3D_TexBind(0, &raysQ_tex);
+	C3D_TexSetWrap(&texture, GPU_REPEAT, GPU_REPEAT);
+	C3D_TexSetFilter(&texture, GPU_LINEAR, GPU_NEAREST);
+	C3D_TexBind(0, &texture);
 	// Configure the first fragment shading substage to blend the texture color with
 	// the vertex color (calculated by the vertex shader using a lighting algorithm)
 	// See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
@@ -154,29 +162,22 @@ static void sceneRender(void)
 			v->position[1] += sprites[i].velocity_y;
 		}
 		vertex *v = &vbo_data[i * 6];
-		if (v->position[0] < 0 || v->position[0] + SPRITE_WIDTH > GSP_SCREEN_HEIGHT_TOP) {
+		if (v->position[0] < 0 || v->position[0] + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP) {
 			sprites[i].velocity_x *= -1;
 		}
-		if (v->position[1] < 0 || v->position[1] + SPRITE_HEIGHT > GSP_SCREEN_WIDTH) {
+		if (v->position[1] < 0 || v->position[1] + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH) {
 			sprites[i].velocity_y *= -1;
 		}
 	}
 
 	// Draw the VBO
 	C3D_DrawArrays(GPU_TRIANGLES, 0, current_sprites * 6);
-
-	//consoleClear();
-
-	printf("\x1b[1;1HSprites: %zu/%u\x1b[K", current_sprites, MAX_SPRITES);
-	printf("\x1b[2;1HCPU:     %6.2f%%\x1b[K", C3D_GetProcessingTime()*6.0f);
-	printf("\x1b[3;1HGPU:     %6.2f%%\x1b[K", C3D_GetDrawingTime()*6.0f);
-	printf("\x1b[4;1HCmdBuf:  %6.2f%%\x1b[K", C3D_GetCmdBufUsage()*100.0f);
 }
 
 static void sceneExit(void)
 {
 	// Free the texture
-	C3D_TexDelete(&raysQ_tex);
+	C3D_TexDelete(&texture);
 
 	// Free the VBO
 	linearFree(vbo_data);
@@ -221,19 +222,26 @@ int main()
 		if (kHeld & KEY_LEFT)
 			current_sprites = max(current_sprites - 100, 1);
 
+		TickCounter start;
+		osTickCounterStart(&start);
+
 		// Render the scene
 		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 		
-	struct timespec start, end;
-	clock_gettime(CLOCK_MONOTONIC, &start);
 		C3D_RenderTargetClear(target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 		C3D_FrameDrawOn(target);
 		sceneRender();
 		C3D_FrameEnd(0);
 		
-		clock_gettime(CLOCK_MONOTONIC, &end);
-		double delta_ms = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_nsec - start.tv_nsec) / 1000000.0;
-		printf("\x1b[5;1HFPS:     %6.2fms\x1b[K", delta_ms);
+		osTickCounterUpdate(&start);
+		double frametime = osTickCounterRead(&start);
+
+		printf("\x1b[1;1H  Sprites: %zu/%u\x1b[K", current_sprites, MAX_SPRITES);
+		printf("\x1b[2;1H      CPU: %.2fms\x1b[K", C3D_GetProcessingTime());
+		printf("\x1b[3;1H      GPU: %.2fms\x1b[K", C3D_GetDrawingTime());
+		printf("\x1b[4;1H   CmdBuf: %.2f%%\x1b[K", C3D_GetCmdBufUsage()*100.0f);
+		printf("\x1b[5;1HFrametime: %.2fms\x1b[K", frametime);
+		printf("\x1b[6;1H      FPS: %.2f\x1b[K", 1.0 / frametime * 1000.0);
 	}
 
 	// Deinitialize the scene
