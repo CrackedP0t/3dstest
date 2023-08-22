@@ -35,7 +35,7 @@ static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
 static int uLoc_projection;
 static int uLoc_tint;
-static int uLoc_slider;
+static int uLoc_depthinfo;
 static C3D_Mtx projection;
 
 static vertex *vbo_data;
@@ -46,7 +46,9 @@ static C3D_Tex texture;
 #define SPRITE_WIDTH (64.0f)
 #define ORIGINAL_WIDTH (112.0f)
 #define ORIGINAL_HEIGHT (112.0f)
-#define MAX_DEPTH (-50.0f)
+#define MIN_DEPTH (-100.0f)
+#define MAX_DEPTH (20.0f)
+#define DEEPNESS (MAX_DEPTH - MIN_DEPTH)
 
 static int current_sprites = 10;
 static spriteinfo sprites[MAX_SPRITES];
@@ -94,7 +96,7 @@ static void sceneInit(void)
 	// Get the location of the uniforms
 	uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
 	uLoc_tint = shaderInstanceGetUniformLocation(program.vertexShader, "tint");
-	uLoc_slider = shaderInstanceGetUniformLocation(program.vertexShader, "slider");
+	uLoc_depthinfo = shaderInstanceGetUniformLocation(program.vertexShader, "depthinfo");
 
 	// Configure attributes for use with the vertex shader
 	C3D_AttrInfo *attrInfo = C3D_GetAttrInfo();
@@ -119,7 +121,7 @@ static void sceneInit(void)
 		float x = randbetween(0, width);
 		float y = randbetween(0, height);
 
-		add_rect(&vbo_data[i * 6], x, y, (1.0 - (float)i / (float)MAX_SPRITES) * MAX_DEPTH, SPRITE_WIDTH, SPRITE_HEIGHT);
+		add_rect(&vbo_data[i * 6], x, y, MIN_DEPTH + (float)i / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT);
 
 		spriteinfo info =  {randbetween(-2, 2), randbetween(-2, 2)};
 		sprites[i] = info;
@@ -162,16 +164,16 @@ static void update(float delta) {
 		}
 		if (v->position[1] < 0 || v->position[1] + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH) {
 			sprites[i].velocity_y *= -1;
-		}-
+		}
 	}
 }
 
-static void sceneRender(float side)
+static void sceneRender(float iod)
 {
 	// Update the uniforms
 	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
 	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_tint, 1.0f, 1.0f, 1.0f, 1.0f);
-	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_slider, side, side, side, side);
+	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_depthinfo, iod, MIN_DEPTH, MAX_DEPTH, DEEPNESS);
 
 	// Draw the VBO
 	C3D_DrawArrays(GPU_TRIANGLES, 0, current_sprites * 6);

@@ -3,7 +3,7 @@
 ; Uniforms
 	.fvec projection[4]
 	.fvec tint
-	.fvec slider
+	.fvec depthinfo
 
 	; Constants
 	.constf myconst(0.0, 1.0, -1.0, 0.1)
@@ -25,7 +25,7 @@
 		mov r0.xyz, inpos
 		mov r0.w,   ones
 
-		mul r5.x, slider.x, r0.z
+		mul r5.x, depthinfo.x, r0.z
 		add r0.x, r0.x, r5.x
 	
 		; outpos = projectionMatrix * inpos
@@ -34,11 +34,15 @@
 		dp4 outpos.z, projection[2], r0
 		dp4 outpos.w, projection[3], r0
 
-		mov r4, myconst
+		mov r2, depthinfo
 
-		rcp r5, myconst2
-		mul r5, r5, r0.zzzz
-		add r5, r4.zzzz, r5
+		; r3 = Z - min_depth
+		add r3, r0.zzzz, -r2.yyyy
+
+		; r5 = (Z - min_depth) / deepness
+		rcp r5, r2.wwww
+		mul r5, r5.xxxx, r3
+		; add r5, myconst.zzzz, r5
 
 		mov outclr.rgb, r5.rgb
 		mov outclr.a, ones
