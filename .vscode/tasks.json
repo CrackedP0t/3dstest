@@ -4,32 +4,67 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "options": {
-                "shell": {
-                    "executable": "C:\\msys64\\usr\\bin\\bash.exe",
-                    "args": [
-                        "--login",
-                        "-c"
-                    ]
-                },
-                "env": {
-                    "MSYSTEM": "ucrt64",
-                    "CHERE_INVOKING": "1"
-                }
-            },
             "label": "Make",
             "type": "shell",
             "command": "make",
             "presentation": {
                 "reveal": "always",
-                "panel": "dedicated",
+                "panel": "shared",
                 "clear": true,
                 "echo": false,
-                "showReuseMessage": false,
+                "showReuseMessage": false
             },
             "problemMatcher": [
                 "$gcc"
             ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Make and emulate",
+            "dependsOn": [
+                "Make"
+            ],
+            "type": "shell",
+            "command": "citra-qt",
+            "args": [
+                "*.3dsx"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": false,
+                "echo": true,
+                "showReuseMessage": false
+            },
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Make and send",
+            "dependsOn": [
+                "Make"
+            ],
+            "type": "shell",
+            "command": "3dslink",
+            "args": [
+                "-a",
+                "192.168.47.75",
+                "*.3dsx"
+            ],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": false,
+                "echo": true,
+                "showReuseMessage": false
+            },
+            "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
