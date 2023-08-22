@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include "vshader_shbin.h"
-#include "raysQ_256_t3x.h"
+#include "raysQ_t3x.h"
 #define max(a,b)             \
 ({                           \
     __typeof__ (a) _a = (a); \
@@ -21,7 +21,7 @@
 })
 
 
-#define CLEAR_COLOR 0x68B0D8FF
+const int CLEAR_COLOR = 0x0437F2FF;
 
 #define DISPLAY_TRANSFER_FLAGS                                                                     \
 	(GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) |               \
@@ -41,11 +41,12 @@ static C3D_Mtx projection;
 static vertex *vbo_data;
 static C3D_Tex texture;
 
-#define MAX_SPRITES (15000)
+#define MAX_SPRITES (100)
 #define SPRITE_HEIGHT (64.0f)
 #define SPRITE_WIDTH (64.0f)
-#define ORIGINAL_WIDTH (256.0)
-#define ORIGINAL_HEIGHT (256.0)
+#define ORIGINAL_WIDTH (112.0f)
+#define ORIGINAL_HEIGHT (112.0f)
+#define MAX_DEPTH (-50.0f)
 
 static int current_sprites = 10;
 static spriteinfo sprites[MAX_SPRITES];
@@ -105,7 +106,7 @@ static void sceneInit(void)
 	Mtx_OrthoTilt(&projection, 0, 400.0, 240, 0, 1000.0, -1000.0, true);
 
 	// Load the texture and bind it to the first texture unit
-	if (!loadTextureFromMem(&texture, NULL, raysQ_256_t3x, raysQ_256_t3x_size))
+	if (!loadTextureFromMem(&texture, NULL, raysQ_t3x, raysQ_t3x_size))
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
@@ -118,7 +119,7 @@ static void sceneInit(void)
 		float x = randbetween(0, width);
 		float y = randbetween(0, height);
 
-		add_rect(&vbo_data[i * 6], x, y, randbetween(-20.0, -1), SPRITE_WIDTH, SPRITE_HEIGHT);
+		add_rect(&vbo_data[i * 6], x, y, (1.0 - (float)i / (float)MAX_SPRITES) * MAX_DEPTH, SPRITE_WIDTH, SPRITE_HEIGHT);
 
 		spriteinfo info =  {randbetween(-2, 2), randbetween(-2, 2)};
 		sprites[i] = info;
@@ -137,10 +138,10 @@ static void sceneInit(void)
 	// See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
 	C3D_TexEnv *env = C3D_GetTexEnv(0);
 	C3D_TexEnvInit(env);
-	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_CONSTANT, 0);
+	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, 0);
 	C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 
-	C3D_DepthTest(true, GPU_ALWAYS, GPU_WRITE_ALL);
+	// C3D_DepthTest(true, GPU_ALWAYS, GPU_WRITE_ALL);
 	C3D_CullFace(GPU_CULL_NONE);
 }
 
@@ -161,7 +162,7 @@ static void update(float delta) {
 		}
 		if (v->position[1] < 0 || v->position[1] + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH) {
 			sprites[i].velocity_y *= -1;
-		}
+		}-
 	}
 }
 
@@ -242,8 +243,6 @@ int main()
 
 		if (!paused)
 			update(1.0);
-
-		printf("\n\n\n\n\n\n\n%f\n", iod);
 		
 		C3D_RenderTargetClear(left_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 		C3D_FrameDrawOn(left_target);
