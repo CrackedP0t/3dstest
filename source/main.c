@@ -35,7 +35,7 @@ static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
 static int uLoc_projection;
 static int uLoc_tint;
-static int uLoc_side;
+static int uLoc_slider;
 static C3D_Mtx projection;
 
 static vertex *vbo_data;
@@ -93,7 +93,7 @@ static void sceneInit(void)
 	// Get the location of the uniforms
 	uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
 	uLoc_tint = shaderInstanceGetUniformLocation(program.vertexShader, "tint");
-	uLoc_side = shaderInstanceGetUniformLocation(program.vertexShader, "side");
+	uLoc_slider = shaderInstanceGetUniformLocation(program.vertexShader, "slider");
 
 	// Configure attributes for use with the vertex shader
 	C3D_AttrInfo *attrInfo = C3D_GetAttrInfo();
@@ -170,7 +170,7 @@ static void sceneRender(float side)
 	// Update the uniforms
 	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
 	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_tint, 1.0f, 1.0f, 1.0f, 1.0f);
-	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_side, side, side, side, side);
+	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_slider, side, side, side, side);
 
 	// Draw the VBO
 	C3D_DrawArrays(GPU_TRIANGLES, 0, current_sprites * 6);

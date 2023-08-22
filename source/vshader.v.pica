@@ -3,7 +3,7 @@
 ; Uniforms
 	.fvec projection[4]
 	.fvec tint
-	.fvec side
+	.fvec slider
 
 	; Constants
 	.constf myconst(0.0, 1.0, -1.0, 0.1)
@@ -24,7 +24,7 @@
 		mov r0.xyz, inpos
 		mov r0.w,   ones
 
-		mul r5.x, side.x, r0.z
+		mul r5.x, slider.x, r0.z
 		add r0.x, r0.x, r5.x
 	
 		; outpos = projectionMatrix * inpos
