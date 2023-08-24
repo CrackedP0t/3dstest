@@ -1,6 +1,6 @@
--f auto-etc1 -z auto --atlas
-emotes/2.png   emotes/Beef.png     emotes/D.png     emotes/H.png     emotes/K.png     emotes/Mom.png    emotes/Pure.png  emotes/Q4.png     emotes/T.png      emotes/Z.png
-emotes/3.png   emotes/Blue.png     emotes/E.png     emotes/Helm.png  emotes/L.png     emotes/N.png      emotes/Q.png     emotes/S.png      emotes/Thump.png
-emotes/3c.png  emotes/Buckets.png  emotes/F.png     emotes/Hoah.png  emotes/Lick.png  emotes/P.png      emotes/Q1.png    emotes/Shock.png  emotes/Troll.png
-emotes/A.png   emotes/C.png        emotes/Face.png  emotes/I.png     emotes/Love.png  emotes/Pog.png    emotes/Q2.png    emotes/Shrug.png  emotes/W.png
-emotes/B.png   emotes/Clerk.png    emotes/Fox.png   emotes/J.png     emotes/Lurk.png  emotes/Pride.png  emotes/Q3.png    emotes/Shy.png    emotes/Y.png
+-f auto-etc1 -z auto --atlas --border transparent
+emotes/2.png   emotes/Beef.png     emotes/D.png     emotes/H.png     emotes/K.png     emotes/Mom.png    emotes/Pure.png   emotes/T.png      emotes/Z.png
+emotes/3.png   emotes/Blue.png     emotes/E.png     emotes/Helm.png  emotes/L.png     emotes/N.png      emotes/Q.png      emotes/S.png      emotes/Thump.png
+emotes/3c.png  emotes/Buckets.png  emotes/F.png     emotes/Hoah.png  emotes/Lick.png  emotes/P.png      emotes/Shock.png  emotes/Troll.png
+emotes/A.png   emotes/C.png        emotes/Face.png  emotes/I.png     emotes/Love.png  emotes/Pog.png    emotes/Shrug.png  emotes/W.png
+emotes/B.png   emotes/Clerk.png    emotes/Fox.png   emotes/J.png     emotes/Lurk.png  emotes/Pride.png  emotes/Shy.png    emotes/Y.png

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include "vshader_shbin.h"
-#include "raysQ_64_t3x.h"
+#include "emotes_t3x.h"
 #define max(a,b)             \
 ({                           \
     __typeof__ (a) _a = (a); \
@@ -40,6 +40,7 @@ static C3D_Mtx projection;
 
 static vertex *vbo_data;
 static C3D_Tex texture;
+Tex3DS_Texture t3x;
 
 #define MAX_SPRITES (1500)
 #define SPRITE_HEIGHT (64.0f)
@@ -50,18 +51,17 @@ static C3D_Tex texture;
 #define MAX_DEPTH (10.0f)
 #define DEEPNESS (MAX_DEPTH - MIN_DEPTH)
 
-static int current_sprites = 10;
+static int current_sprites = 1;
 static spriteinfo sprites[MAX_SPRITES];
 
 // Helper function for loading a texture from memory
 static bool loadTextureFromMem(C3D_Tex *tex, C3D_TexCube *cube, const void *data, size_t size)
 {
-	Tex3DS_Texture t3x = Tex3DS_TextureImport(data, size, tex, cube, false);
+	t3x = Tex3DS_TextureImport(data, size, tex, cube, false);
 	if (!t3x)
 		return false;
 
 	// Delete the t3x object since we don't need it
-	Tex3DS_TextureFree(t3x);
 	return true;
 }
 
@@ -69,17 +69,16 @@ float randbetween(float min, float max) {
 	return (float)rand() / RAND_MAX * (max - min) + min;
 }
 
-void add_rect(vertex * dest, float x, float y, float z, float width, float height) {
-	float u =  (float)ORIGINAL_WIDTH / (float)texture.width;
-	float v =  1.0 - (float)ORIGINAL_HEIGHT / (float)texture.height;
+void add_rect(vertex *dest, float x, float y, float z, float width, float height, size_t index) {
+	const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, index);
 
 	vertex vertex_list[] = {
-		{{x, y, z}, {0.0, 1.0}},
-		{{x + width, y, z}, {u, 1.0}},
-		{{x, y + height, z}, {0.0, v}},
-		{{x, y + height, z}, {0.0, v}},
-		{{x + width, y, z}, {u, 1.0}},
-		{{x + width, y + height, z}, {u, v}},
+		{{x, y, z}, {ts->left, ts->top}},
+		{{x + width, y, z}, {ts->right, ts->top}},
+		{{x, y + height, z}, {ts->left, ts->bottom}},
+		{{x, y + height, z}, {ts->left, ts->bottom}},
+		{{x + width, y, z}, {ts->right, ts->top}},
+		{{x + width, y + height, z}, {ts->right, ts->bottom}},
 	};
 
 	memcpy(dest, vertex_list, sizeof(vertex_list));
@@ -108,7 +107,7 @@ static void sceneInit(void)
 	Mtx_OrthoTilt(&projection, 0, 400.0, 240, 0, 1000.0, -1000.0, true);
 
 	// Load the texture and bind it to the first texture unit
-	if (!loadTextureFromMem(&texture, NULL, raysQ_64_t3x, raysQ_64_t3x_size))
+	if (!loadTextureFromMem(&texture, NULL, emotes_t3x, emotes_t3x_size))
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
@@ -121,7 +120,7 @@ static void sceneInit(void)
 		float x = randbetween(0, width);
 		float y = randbetween(0, height);
 
-		add_rect(&vbo_data[i * 6], x, y, MIN_DEPTH + (float)(i + 1) / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT);
+		add_rect(&vbo_data[i * 6], x, y, MIN_DEPTH + (float)(i + 1) / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT, randbetween(0, Tex3DS_GetNumSubTextures(t3x)));
 
 		spriteinfo info =  {randbetween(-2, 2), randbetween(-2, 2)};
 		sprites[i] = info;
@@ -143,7 +142,6 @@ static void sceneInit(void)
 	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, 0);
 	C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 
-	// C3D_DepthTest(true, GPU_ALWAYS, GPU_WRITE_ALL);
 	C3D_CullFace(GPU_CULL_NONE);
 }
 
@@ -197,6 +195,7 @@ static bool paused = false;
 
 int main()
 {
+	srand(time(NULL));
 	// Initialize graphics
 	gfxInitDefault();
 	gfxSet3D(true);
