@@ -1,0 +1,18 @@
+{
+    "files.associations": {
+        "tex3ds.h": "c",
+        "citro3d.h": "c",
+        "texture.h": "c"
+    },
+    "terminal.integrated.automationProfile.windows": {
+        "path": "C:\\msys64\\usr\\bin\\bash.exe",
+        "args": [
+            "--login",
+            "-c"
+        ],
+        "env": {
+            "MSYSTEM": "ucrt64",
+            "CHERE_INVOKING": "1"
+        }
+    }
+}

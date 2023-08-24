@@ -8,14 +8,14 @@
                 "C:\\msys64\\opt\\devkitPro\\devkitARM\\include\\**",
                 "C:\\msys64\\opt\\devkitPro\\devkitARM\\arm-none-eabi\\include\\**"
             ],
-            "compilerPath": "C:\\msys64\\opt\\devkitPro\\devkitARM\\bin\\arm-none-eabi-gcc.exe",
-            "cppStandard": "gnu++11",
+            "cppStandard": "gnu++20",
             "intelliSenseMode": "windows-gcc-arm",
             "defines": [
                 "ARM11",
                 "__3DS__"
             ],
-            "cStandard": "gnu11"
+            "cStandard": "gnu17",
+            "compilerPath": "C:\\msys64\\opt\\devkitPro\\devkitARM\\bin\\arm-none-eabi-gcc.exe"
         }
     ],
     "version": 4
