@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include "vshader_shbin.h"
-#include "raysQ_t3x.h"
+#include "raysQ_64_t3x.h"
 #define max(a,b)             \
 ({                           \
     __typeof__ (a) _a = (a); \
@@ -41,13 +41,13 @@ static C3D_Mtx projection;
 static vertex *vbo_data;
 static C3D_Tex texture;
 
-#define MAX_SPRITES (100)
+#define MAX_SPRITES (1500)
 #define SPRITE_HEIGHT (64.0f)
 #define SPRITE_WIDTH (64.0f)
-#define ORIGINAL_WIDTH (112.0f)
-#define ORIGINAL_HEIGHT (112.0f)
-#define MIN_DEPTH (-100.0f)
-#define MAX_DEPTH (20.0f)
+#define ORIGINAL_WIDTH (64.0f)
+#define ORIGINAL_HEIGHT (64.0f)
+#define MIN_DEPTH (-25.0f)
+#define MAX_DEPTH (10.0f)
 #define DEEPNESS (MAX_DEPTH - MIN_DEPTH)
 
 static int current_sprites = 10;
@@ -108,7 +108,7 @@ static void sceneInit(void)
 	Mtx_OrthoTilt(&projection, 0, 400.0, 240, 0, 1000.0, -1000.0, true);
 
 	// Load the texture and bind it to the first texture unit
-	if (!loadTextureFromMem(&texture, NULL, raysQ_t3x, raysQ_t3x_size))
+	if (!loadTextureFromMem(&texture, NULL, raysQ_64_t3x, raysQ_64_t3x_size))
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
@@ -121,7 +121,7 @@ static void sceneInit(void)
 		float x = randbetween(0, width);
 		float y = randbetween(0, height);
 
-		add_rect(&vbo_data[i * 6], x, y, MIN_DEPTH + (float)i / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT);
+		add_rect(&vbo_data[i * 6], x, y, MIN_DEPTH + (float)(i + 1) / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT);
 
 		spriteinfo info =  {randbetween(-2, 2), randbetween(-2, 2)};
 		sprites[i] = info;
@@ -157,6 +157,7 @@ static void update(float delta) {
 			vertex *v = &vbo_data[i * 6 + j];
 			v->position[0] += sprites[i].velocity_x;
 			v->position[1] += sprites[i].velocity_y;
+			v->position[2] = MIN_DEPTH + (float)(i + 1) / (float)current_sprites * DEEPNESS;
 		}
 		vertex *v = &vbo_data[i * 6];
 		if (v->position[0] < 0 || v->position[0] + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP) {
@@ -231,9 +232,9 @@ int main()
 		if ((kHeld & KEY_DOWN) && current_sprites > 1)
 			current_sprites--;
 			
-		if ((kHeld & KEY_RIGHT) && current_sprites)
+		if ((kDown & KEY_RIGHT) && current_sprites)
 			current_sprites = min(current_sprites + 100, MAX_SPRITES);
-		if (kHeld & KEY_LEFT)
+		if (kDown & KEY_LEFT)
 			current_sprites = max(current_sprites - 100, 1);
 
 
@@ -249,9 +250,11 @@ int main()
 		C3D_RenderTargetClear(left_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 		C3D_FrameDrawOn(left_target);
 		sceneRender(iod);
-		C3D_RenderTargetClear(right_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
-		C3D_FrameDrawOn(right_target);
-		sceneRender(-iod);
+		if (iod > 0.0f) {
+			C3D_RenderTargetClear(right_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
+			C3D_FrameDrawOn(right_target);
+			sceneRender(-iod);
+		}
 		C3D_FrameEnd(0);
 		
 		osTickCounterUpdate(&start);
