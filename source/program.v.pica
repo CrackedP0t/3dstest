@@ -1,0 +1,19 @@
+; Example PICA200 vertex shader
+
+; Uniforms
+
+; Outputs
+.out outpos dummy
+.out outwhtc dummy
+
+; Inputs (defined
+.alias inpos v0
+.alias inwhtc v1
+
+.entry vmain
+.proc vmain
+	mov outpos, inpos
+	mov outwhtc, inwhtc
+
+	end
+.end
