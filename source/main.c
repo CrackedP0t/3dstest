@@ -45,9 +45,9 @@ static vertex *vbo_data;
 static bool largetex = true;
 
 static C3D_Tex texture_110;
-Tex3DS_Texture t3x_110;
+static Tex3DS_Texture t3x_110;
 static C3D_Tex texture_64;
-Tex3DS_Texture t3x_64;
+static Tex3DS_Texture t3x_64;
 
 #define MAX_SPRITES (1500)
 #define SPRITE_HEIGHT (64.0f)
@@ -57,7 +57,7 @@ Tex3DS_Texture t3x_64;
 #define DEEPNESS (MAX_DEPTH - MIN_DEPTH)
 
 
-static int current_sprites = 500;
+static int current_sprites = 1;
 static spriteinfo sprites[MAX_SPRITES];
 
 // Helper function for loading a texture from memory
