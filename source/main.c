@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include "vshader_shbin.h"
-#include "emotes110_t3x.h"
-#include "emotes64_t3x.h"
+#include "pixelflakes_t3x.h"
 
 #define max(a,b)             \
 ({                           \
@@ -23,7 +22,7 @@
 })
 
 
-const int CLEAR_COLOR = 0x0437F2FF;
+const int CLEAR_COLOR = 0x00000000;
 
 #define DISPLAY_TRANSFER_FLAGS                                                                     \
 	(GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) |               \
@@ -32,30 +31,28 @@ const int CLEAR_COLOR = 0x0437F2FF;
 
 typedef struct {float x; float y; float z; float u; float v;} vertex;
 typedef struct {float x; float y; float z; float velocity_x; float velocity_y; size_t t3x_index;} spriteinfo;
+typedef struct {float x; float y; float z; } vector3;
 
 static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
 static int uLoc_projection;
 static int uLoc_tint;
-static int uLoc_depthinfo;
 static C3D_Mtx projection;
 
 static vertex *vbo_data;
 
-static bool largetex = true;
+static C3D_Tex texture;
+static Tex3DS_Texture t3x;
 
-static C3D_Tex texture_110;
-static Tex3DS_Texture t3x_110;
-static C3D_Tex texture_64;
-static Tex3DS_Texture t3x_64;
+static vector3 player;
+static vector3 camera = {0.0, 0.0, 0.0};
 
 #define MAX_SPRITES (1500)
 #define SPRITE_HEIGHT (64.0f)
 #define SPRITE_WIDTH (64.0f)
-#define MIN_DEPTH (-25.0f)
-#define MAX_DEPTH (10.0f)
+#define MIN_DEPTH (-10.0f)
+#define MAX_DEPTH (-1.0f)
 #define DEEPNESS (MAX_DEPTH - MIN_DEPTH)
-
 
 static int current_sprites = 1;
 static spriteinfo sprites[MAX_SPRITES];
@@ -134,7 +131,6 @@ static void sceneInit(void)
 	// Get the location of the uniforms
 	uLoc_projection = shaderInstanceGetUniformLocation(program.vertexShader, "projection");
 	uLoc_tint = shaderInstanceGetUniformLocation(program.vertexShader, "tint");
-	uLoc_depthinfo = shaderInstanceGetUniformLocation(program.vertexShader, "depthinfo");
 
 	// Configure attributes for use with the vertex shader
 	C3D_AttrInfo *attrInfo = C3D_GetAttrInfo();
@@ -143,13 +139,10 @@ static void sceneInit(void)
 	AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
 
 	// Compute the projection matrix
-	Mtx_OrthoTilt(&projection, 0, 400.0, 240, 0, 1000.0, -1000.0, true);
+	// Mtx_OrthoTilt(&projection, 0, 400.0, 240, 0, 1000.0, -1000.0, true);
 
 	// Load the texture and bind it to the first texture unit
-	if (!loadTextureFromMem(&texture_110, &t3x_110, NULL, emotes110_t3x, emotes110_t3x_size))
-		svcBreak(USERBREAK_PANIC);
-		
-	if (!loadTextureFromMem(&texture_64, &t3x_64, NULL, emotes64_t3x, emotes64_t3x_size))
+	if (!loadTextureFromMem(&texture, &t3x, NULL, pixelflakes_t3x, pixelflakes_t3x_size))
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
@@ -159,12 +152,11 @@ static void sceneInit(void)
 		float width = 400 - SPRITE_WIDTH;
 		float height = 240 - SPRITE_HEIGHT;
 
-		spriteinfo s =  {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH), randbetween(-2, 2), randbetween(-2, 2),  randbetween(0, Tex3DS_GetNumSubTextures(t3x_110))};
+		spriteinfo s =  {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH), randbetween(-2, 2), randbetween(-2, 2),  randbetween(0, Tex3DS_GetNumSubTextures(t3x))};
 		sprites[i] = s;
 		
-		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(largetex ? t3x_110 : t3x_64, s.t3x_index);
+		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, s.t3x_index);
 
-		// add_rect(&vbo_data[i * 6], s.x, s.y, MIN_DEPTH + (float)(i + 1) / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
 		add_rect(&vbo_data[i * 6], s.x, s.y, s.z, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
 	}
 
@@ -174,9 +166,8 @@ static void sceneInit(void)
 	BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 2, 0x10);
 
 	// C3D_TexSetWrap(&texture, GPU_REPEAT, GPU_REPEAT);
-	C3D_TexSetFilter(&texture_110, GPU_LINEAR, GPU_NEAREST);
-	C3D_TexSetFilter(&texture_64, GPU_LINEAR, GPU_NEAREST);
-	C3D_TexBind(0, &texture_110);
+	C3D_TexSetFilter(&texture, GPU_NEAREST, GPU_NEAREST);
+	C3D_TexBind(0, &texture);
 	// Configure the first fragment shading substage to blend the texture color with
 	// the vertex color (calculated by the vertex shader using a lighting algorithm)
 	// See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
@@ -210,10 +201,18 @@ static void update(float delta) {
 
 static void sceneRender(float iod)
 {
+	Mtx_PerspStereoTilt(&projection, C3D_AngleFromDegrees(45.0f), C3D_AspectRatioTop, 0.0001f, 1000.0, iod, 2.0, false);
+
+	C3D_Mtx view;
+	Mtx_Identity(&view);
+	Mtx_Translate(&view, -camera.x, -camera.y, -camera.z, true);
+	Mtx_Scale(&view, 1.0 / 400.0, 1.0 / 400.0, 1.0);
+	
+	Mtx_Multiply(&projection, &projection, &view);
+
 	// Update the uniforms
 	C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLoc_projection, &projection);
 	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_tint, 1.0f, 1.0f, 1.0f, 1.0f);
-	C3D_FVUnifSet(GPU_VERTEX_SHADER, uLoc_depthinfo, iod, MIN_DEPTH, MAX_DEPTH, DEEPNESS);
 
 	// Draw the VBO
 	C3D_DrawArrays(GPU_TRIANGLES, 0, current_sprites * 6);
@@ -222,7 +221,7 @@ static void sceneRender(float iod)
 static void sceneExit(void)
 {
 	// Free the texture
-	C3D_TexDelete(&texture_110);
+	C3D_TexDelete(&texture);
 
 	// Free the VBO
 	linearFree(vbo_data);
@@ -259,11 +258,11 @@ int main()
 	while (aptMainLoop())
 	{
 		// Render the scene
-		C3D_FrameBegin(/*C3D_FRAME_SYNCDRAW*/0);
+		C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
 		hidScanInput();
 
-		float iod = osGet3DSliderState();
+		float iod = osGet3DSliderState() / 3;
 
 		// Respond to user input
 		u32 kDown = hidKeysDown();
@@ -273,29 +272,28 @@ int main()
 			paused = !paused;
 			
 		u32 kHeld = hidKeysHeld();
-		if ((kHeld & KEY_UP) && current_sprites < MAX_SPRITES)
+		if ((kHeld & KEY_R) && current_sprites < MAX_SPRITES)
 			current_sprites++;
-		if ((kHeld & KEY_DOWN) && current_sprites > 1)
+		if ((kHeld & KEY_L) && current_sprites > 1)
 			current_sprites--;
 			
-		if ((kDown & KEY_RIGHT) && current_sprites)
-			current_sprites = min(current_sprites + 100, MAX_SPRITES);
-		if (kDown & KEY_LEFT)
-			current_sprites = max(current_sprites - 100, 1);
+		// if ((kDown & KEY_RIGHT) && current_sprites)
+		// 	current_sprites = min(current_sprites + 100, MAX_SPRITES);
+		// if (kDown & KEY_LEFT)
+		// 	current_sprites = max(current_sprites - 100, 1);
 
-		if (kDown & KEY_X) {
-			largetex = !largetex;
-			if (largetex) {
-				C3D_TexBind(0, &texture_110);
-			} else {
-				C3D_TexBind(0, &texture_64);
-			}
-			for (int i = 0; i < MAX_SPRITES; i++) {
-				spriteinfo *s = &sprites[i];
-				const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(largetex ? t3x_110 : t3x_64, s->t3x_index);
-				uv_rect(&vbo_data[i * 6], ts);
-			}
-		}
+		if (kHeld & KEY_CPAD_UP)
+			camera.y += 0.1;
+		if (kHeld & KEY_CPAD_DOWN)
+			camera.y -= 0.1;
+		if (kHeld & KEY_CPAD_LEFT)
+			camera.x -= 0.1;
+		if (kHeld & KEY_CPAD_RIGHT)
+			camera.x += 0.1;
+		if (kHeld & KEY_A)
+			camera.z += 0.1;
+		if (kHeld & KEY_B)
+			camera.z -= 0.1;
 
 		osTickCounterUpdate(&counter);
 		double frametime = osTickCounterRead(&counter);
@@ -305,11 +303,11 @@ int main()
 
 		C3D_RenderTargetClear(left_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 		C3D_FrameDrawOn(left_target);
-		sceneRender(iod);
+		sceneRender(-iod);
 		if (iod > 0.0f) {
 			C3D_RenderTargetClear(right_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 			C3D_FrameDrawOn(right_target);
-			sceneRender(-iod);
+			sceneRender(iod);
 		}
 		C3D_FrameEnd(0);
 
@@ -319,6 +317,7 @@ int main()
 		printf("\x1b[4;1H   CmdBuf: %.2f%%\x1b[K", C3D_GetCmdBufUsage()*100.0f);
 		printf("\x1b[5;1HFrametime: %.2fms\x1b[K", frametime);
 		printf("\x1b[6;1H      FPS: %.2f\x1b[K", 1.0 / frametime * 1000.0);
+		printf("\x1b[7;1H   Camera: %f, %f, %f\x1b[K", camera.x, camera.y, camera.z);
 	}
 
 	// Deinitialize the scene
