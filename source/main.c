@@ -31,7 +31,7 @@ const int CLEAR_COLOR = 0x0437F2FF;
 	 GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
 typedef struct {float x; float y; float z; float u; float v;} vertex;
-typedef struct {float x; float y; float velocity_x; float velocity_y; size_t t3x_index;} spriteinfo;
+typedef struct {float x; float y; float z; float velocity_x; float velocity_y; size_t t3x_index;} spriteinfo;
 
 static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
@@ -159,12 +159,13 @@ static void sceneInit(void)
 		float width = 400 - SPRITE_WIDTH;
 		float height = 240 - SPRITE_HEIGHT;
 
-		spriteinfo s =  {randbetween(0, width), randbetween(0, height), randbetween(-2, 2), randbetween(-2, 2),  randbetween(0, Tex3DS_GetNumSubTextures(t3x_110))};
+		spriteinfo s =  {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH), randbetween(-2, 2), randbetween(-2, 2),  randbetween(0, Tex3DS_GetNumSubTextures(t3x_110))};
 		sprites[i] = s;
 		
 		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(largetex ? t3x_110 : t3x_64, s.t3x_index);
 
-		add_rect(&vbo_data[i * 6], s.x, s.y, MIN_DEPTH + (float)(i + 1) / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
+		// add_rect(&vbo_data[i * 6], s.x, s.y, MIN_DEPTH + (float)(i + 1) / (float)MAX_SPRITES * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
+		add_rect(&vbo_data[i * 6], s.x, s.y, s.z, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
 	}
 
 	// Configure buffers
@@ -184,6 +185,8 @@ static void sceneInit(void)
 	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, 0);
 	C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 
+	C3D_AlphaTest(true, GPU_EQUAL, 255);
+
 	C3D_CullFace(GPU_CULL_NONE);
 }
 
@@ -194,7 +197,7 @@ static void update(float delta) {
 		s->x += s->velocity_x * delta;
 		s->y += s->velocity_y * delta;
 
-		move_rect(&vbo_data[i * 6], s->x, s->y, MIN_DEPTH + (float)(i + 1) / (float)current_sprites * DEEPNESS, SPRITE_WIDTH, SPRITE_HEIGHT);
+		move_rect(&vbo_data[i * 6], s->x, s->y, s->z, SPRITE_WIDTH, SPRITE_HEIGHT);
 
 		if (s->x < 0 || s->x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP) {
 			s->velocity_x *= -1;
