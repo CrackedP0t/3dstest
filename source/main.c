@@ -21,7 +21,7 @@
 		_a < _b ? _a : _b;      \
 	})
 
-const int CLEAR_COLOR = 0x00000000;
+const int CLEAR_COLOR = 0xff000000;
 
 #define DISPLAY_TRANSFER_FLAGS                                                                     \
 	(GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) |               \
@@ -36,10 +36,9 @@ typedef struct
 } vector3;
 typedef struct
 {
-	vector3 pos;
-	float u;
-	float v;
-} vertex;
+	float x;
+	float y;
+} vector2;
 typedef struct
 {
 	vector3 pos;
@@ -56,7 +55,8 @@ static int uLoc_projection;
 static int uLoc_tint;
 static C3D_Mtx projection;
 
-static vertex *position_vbo;
+static vector3 *position_vbo;
+static vector2 *uv_vbo;
 static C3D_Tex texture;
 static Tex3DS_Texture t3x;
 
@@ -71,6 +71,13 @@ static vector3 camera = {0.5, 0.5, 0.0};
 
 static int current_sprites = 1;
 static spriteinfo sprites[MAX_SPRITES];
+
+inline vector3 v3(float x, float y, float z) 
+{
+	vector3 n = {x, y, z};
+	return n;
+}
+
 
 inline vector3 v34(C3D_FVec old)
 {
@@ -104,52 +111,32 @@ float randbetween(float min, float max)
 	return (float)rand() / RAND_MAX * (max - min) + min;
 }
 
-void move_rect(vertex *dest, vector3 pos, float width, float height)
+void set_rect(size_t index, vector3 pos, float width, float height)
 {
-	dest[0].pos = pos;
-	dest[1].pos = pos;
-	dest[1].pos.x += width;
-	dest[2].pos = pos;
-	dest[2].pos.y += height;
-	dest[3].pos = pos;
-	dest[3].pos.y += height;
-	dest[4].pos = pos;
-	dest[4].pos.x += width;
-	dest[5].pos = pos;
-	dest[5].pos.x += width;
-	dest[5].pos.y += height;
-}
-
-void add_rect(vertex *dest, vector3 pos, float width, float height, const Tex3DS_SubTexture *ts)
-{
-	vertex vertex_list[] = {
-		{pos, ts->left, ts->top},
-		{pos, ts->right, ts->top},
-		{pos, ts->left, ts->bottom},
-		{pos, ts->left, ts->bottom},
-		{pos, ts->right, ts->top},
-		{pos, ts->right, ts->bottom},
+	vector3 vertex_list[] = {
+		pos,
+		{pos.x + width, pos.y, pos.z},
+		{pos.x, pos.y + height, pos.z},
+		{pos.x, pos.y + height, pos.z},
+		{pos.x + width, pos.y, pos.z},
+		{pos.x + width, pos.y + height, pos.z}
 	};
 
-	memcpy(dest, vertex_list, sizeof(vertex_list));
-
-	move_rect(dest, pos, width, height);
+	memcpy(position_vbo + index, vertex_list, sizeof(vertex_list));
 }
 
-void uv_rect(vertex *dest, const Tex3DS_SubTexture *ts)
+void uv_rect(size_t index, const Tex3DS_SubTexture *ts)
 {
-	dest[0].u = ts->left;
-	dest[0].v = ts->top;
-	dest[1].u = ts->right;
-	dest[1].v = ts->top;
-	dest[2].u = ts->left;
-	dest[2].v = ts->bottom;
-	dest[3].u = ts->left;
-	dest[3].v = ts->bottom;
-	dest[4].u = ts->right;
-	dest[4].v = ts->top;
-	dest[5].u = ts->right;
-	dest[5].v = ts->bottom;
+	vector2 uvs[] = {
+		{ts->left, ts->top},
+		{ts->right, ts->top},
+		{ts->left, ts->bottom},
+		{ts->left, ts->bottom},
+		{ts->right, ts->top},
+		{ts->right, ts->bottom}
+	};
+
+	memcpy(uv_vbo + index, uvs, sizeof(uvs));
 }
 
 static void sceneInit(void)
@@ -167,7 +154,7 @@ static void sceneInit(void)
 	// Configure attributes for use with the vertex shader
 	C3D_AttrInfo *attrInfo = C3D_GetAttrInfo();
 	AttrInfo_Init(attrInfo);
-	AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3); // v0=position
+	AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
 	AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
 
 	// Compute the projection matrix
@@ -178,7 +165,8 @@ static void sceneInit(void)
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
-	position_vbo = linearAlloc(MAX_SPRITES * 6 * sizeof(vertex));
+	position_vbo = linearAlloc(MAX_SPRITES * 6 * sizeof(vector3));
+	uv_vbo = linearAlloc(MAX_SPRITES * 6 * sizeof(vector2));
 
 	for (int i = 0; i < MAX_SPRITES; i++)
 	{
@@ -191,13 +179,15 @@ static void sceneInit(void)
 
 		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, s.t3x_index);
 
-		add_rect(&position_vbo[i * 6], pos, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
+		set_rect(i * 6, pos, SPRITE_WIDTH, SPRITE_HEIGHT);
+		uv_rect(i * 6, ts);
 	}
 
 	// Configure buffers
 	C3D_BufInfo *bufInfo = C3D_GetBufInfo();
 	BufInfo_Init(bufInfo);
-	BufInfo_Add(bufInfo, position_vbo, sizeof(vertex), 2, 0x10);
+	BufInfo_Add(bufInfo, position_vbo, sizeof(vector3), 1, 0x0);
+	BufInfo_Add(bufInfo, uv_vbo, sizeof(vector2), 1, 0x1);
 
 	C3D_TexSetFilter(&texture, GPU_NEAREST, GPU_NEAREST);
 	C3D_TexBind(0, &texture);
@@ -223,7 +213,7 @@ static void update(float delta)
 		s->pos.x += s->velocity_x * delta;
 		s->pos.y += s->velocity_y * delta;
 
-		move_rect(&position_vbo[i * 6], s->pos, SPRITE_WIDTH, SPRITE_HEIGHT);
+		set_rect(i * 6, s->pos, SPRITE_WIDTH, SPRITE_HEIGHT);
 
 		if (s->pos.x < 0 || s->pos.x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP)
 		{
