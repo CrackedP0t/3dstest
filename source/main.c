@@ -7,20 +7,19 @@
 #include "vshader_shbin.h"
 #include "pixelflakes_t3x.h"
 
-#define max(a,b)             \
-({                           \
-    __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a > _b ? _a : _b;       \
-})
+#define max(a, b)               \
+	({                          \
+		__typeof__(a) _a = (a); \
+		__typeof__(b) _b = (b); \
+		_a > _b ? _a : _b;      \
+	})
 
-#define min(a,b)             \
-({                           \
-    __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a < _b ? _a : _b;       \
-})
-
+#define min(a, b)               \
+	({                          \
+		__typeof__(a) _a = (a); \
+		__typeof__(b) _b = (b); \
+		_a < _b ? _a : _b;      \
+	})
 
 const int CLEAR_COLOR = 0x00000000;
 
@@ -29,9 +28,27 @@ const int CLEAR_COLOR = 0x00000000;
 	 GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
 	 GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-typedef struct {float x; float y; float z; } vector3;
-typedef struct {vector3 pos; float u; float v;} vertex;
-typedef struct {vector3 pos; float velocity_x; float velocity_y; float rotation; float velocity_r; size_t t3x_index;} spriteinfo;
+typedef struct
+{
+	float x;
+	float y;
+	float z;
+} vector3;
+typedef struct
+{
+	vector3 pos;
+	float u;
+	float v;
+} vertex;
+typedef struct
+{
+	vector3 pos;
+	float velocity_x;
+	float velocity_y;
+	float rotation;
+	float velocity_r;
+	size_t t3x_index;
+} spriteinfo;
 
 static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
@@ -40,11 +57,9 @@ static int uLoc_tint;
 static C3D_Mtx projection;
 
 static vertex *position_vbo;
-
 static C3D_Tex texture;
 static Tex3DS_Texture t3x;
 
-static vector3 player;
 static vector3 camera = {0.5, 0.5, 0.0};
 
 #define MAX_SPRITES (1500)
@@ -57,12 +72,14 @@ static vector3 camera = {0.5, 0.5, 0.0};
 static int current_sprites = 1;
 static spriteinfo sprites[MAX_SPRITES];
 
-inline vector3 v34(C3D_FVec old) {
+inline vector3 v34(C3D_FVec old)
+{
 	vector3 n = {old.x, old.y, old.z};
 	return n;
 }
 
-inline C3D_FVec v43(vector3 old) {
+inline C3D_FVec v43(vector3 old)
+{
 	C3D_FVec n;
 	n.x = old.x;
 	n.y = old.y;
@@ -82,11 +99,13 @@ static bool loadTextureFromMem(C3D_Tex *tex, Tex3DS_Texture *t3x, C3D_TexCube *c
 	return true;
 }
 
-float randbetween(float min, float max) {
+float randbetween(float min, float max)
+{
 	return (float)rand() / RAND_MAX * (max - min) + min;
 }
 
-void move_rect(vertex *dest, vector3 pos, float width, float height) {
+void move_rect(vertex *dest, vector3 pos, float width, float height)
+{
 	dest[0].pos = pos;
 	dest[1].pos = pos;
 	dest[1].pos.x += width;
@@ -101,7 +120,8 @@ void move_rect(vertex *dest, vector3 pos, float width, float height) {
 	dest[5].pos.y += height;
 }
 
-void add_rect(vertex *dest, vector3 pos, float width, float height, const Tex3DS_SubTexture *ts) {
+void add_rect(vertex *dest, vector3 pos, float width, float height, const Tex3DS_SubTexture *ts)
+{
 	vertex vertex_list[] = {
 		{pos, ts->left, ts->top},
 		{pos, ts->right, ts->top},
@@ -116,7 +136,8 @@ void add_rect(vertex *dest, vector3 pos, float width, float height, const Tex3DS
 	move_rect(dest, pos, width, height);
 }
 
-void uv_rect(vertex *dest, const Tex3DS_SubTexture *ts) {
+void uv_rect(vertex *dest, const Tex3DS_SubTexture *ts)
+{
 	dest[0].u = ts->left;
 	dest[0].v = ts->top;
 	dest[1].u = ts->right;
@@ -159,14 +180,15 @@ static void sceneInit(void)
 	// Create the VBO (vertex buffer object)
 	position_vbo = linearAlloc(MAX_SPRITES * 6 * sizeof(vertex));
 
-	for (int i = 0; i < MAX_SPRITES; i++) {
+	for (int i = 0; i < MAX_SPRITES; i++)
+	{
 		float width = 400 - SPRITE_WIDTH;
 		float height = 240 - SPRITE_HEIGHT;
 
 		vector3 pos = {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH)};
-		spriteinfo s =  {pos, randbetween(-2, 2), randbetween(-2, 2), 0, 0, randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
+		spriteinfo s = {pos, randbetween(-2, 2), randbetween(-2, 2), 0, 0, randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
 		sprites[i] = s;
-		
+
 		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, s.t3x_index);
 
 		add_rect(&position_vbo[i * 6], pos, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
@@ -192,19 +214,23 @@ static void sceneInit(void)
 	C3D_CullFace(GPU_CULL_NONE);
 }
 
-static void update(float delta) {
+static void update(float delta)
+{
 	delta *= 6.0 / 100.0;
-	for (int i = 0; i < current_sprites; i++) {
+	for (int i = 0; i < current_sprites; i++)
+	{
 		spriteinfo *s = &sprites[i];
 		s->pos.x += s->velocity_x * delta;
 		s->pos.y += s->velocity_y * delta;
 
 		move_rect(&position_vbo[i * 6], s->pos, SPRITE_WIDTH, SPRITE_HEIGHT);
 
-		if (s->pos.x < 0 || s->pos.x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP) {
+		if (s->pos.x < 0 || s->pos.x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP)
+		{
 			s->velocity_x *= -1;
 		}
-		if (s->pos.y < 0 || s->pos.y + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH) {
+		if (s->pos.y < 0 || s->pos.y + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH)
+		{
 			s->velocity_y *= -1;
 		}
 	}
@@ -218,7 +244,7 @@ static void sceneRender(float iod)
 	Mtx_Identity(&view);
 	Mtx_Translate(&view, -camera.x, -camera.y, -camera.z, true);
 	Mtx_Scale(&view, 1.0 / 400.0, 1.0 / 400.0, 1.0);
-	
+
 	Mtx_Multiply(&projection, &projection, &view);
 
 	// Update the uniforms
@@ -281,13 +307,13 @@ int main()
 			break; // break in order to return to hbmenu
 		if (kDown & KEY_SELECT)
 			paused = !paused;
-			
+
 		u32 kHeld = hidKeysHeld();
 		if ((kHeld & KEY_R) && current_sprites < MAX_SPRITES)
 			current_sprites++;
 		if ((kHeld & KEY_L) && current_sprites > 1)
 			current_sprites--;
-			
+
 		// if ((kDown & KEY_RIGHT) && current_sprites)
 		// 	current_sprites = min(current_sprites + 100, MAX_SPRITES);
 		// if (kDown & KEY_LEFT)
@@ -315,7 +341,8 @@ int main()
 		C3D_RenderTargetClear(left_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 		C3D_FrameDrawOn(left_target);
 		sceneRender(-iod);
-		if (iod > 0.0f) {
+		if (iod > 0.0f)
+		{
 			C3D_RenderTargetClear(right_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 			C3D_FrameDrawOn(right_target);
 			sceneRender(iod);
@@ -325,7 +352,7 @@ int main()
 		printf("\x1b[1;1H  Sprites: %zu/%u\x1b[K", current_sprites, MAX_SPRITES);
 		printf("\x1b[2;1H      CPU: %.2fms\x1b[K", C3D_GetProcessingTime());
 		printf("\x1b[3;1H      GPU: %.2fms\x1b[K", C3D_GetDrawingTime());
-		printf("\x1b[4;1H   CmdBuf: %.2f%%\x1b[K", C3D_GetCmdBufUsage()*100.0f);
+		printf("\x1b[4;1H   CmdBuf: %.2f%%\x1b[K", C3D_GetCmdBufUsage() * 100.0f);
 		printf("\x1b[5;1HFrametime: %.2fms\x1b[K", frametime);
 		printf("\x1b[6;1H      FPS: %.2f\x1b[K", 1.0 / frametime * 1000.0);
 		printf("\x1b[7;1H   Camera: %.2f, %.2f, %.2f\x1b[K", camera.x, camera.y, camera.z);
