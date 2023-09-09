@@ -27,15 +27,16 @@
 		_a < _b ? _a : _b;      \
 	})
 
-const int CLEAR_COLOR = 0xff000000;
+const int CLEAR_COLOR = 0x00000000;
 
 #define DISPLAY_TRANSFER_FLAGS                                                                     \
 	(GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) |               \
 	 GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
 	 GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-struct Spriteinfo {
-	public:
+struct Spriteinfo
+{
+public:
 	glm::vec3 pos;
 	glm::vec2 velocity;
 	float rotation;
@@ -56,22 +57,22 @@ static Tex3DS_Texture t3x;
 
 static glm::vec3 camera = {0.5, 0.5, 0.0};
 
-#define MAX_SPRITES (1500)
-#define SPRITE_HEIGHT (64.0f)
-#define SPRITE_WIDTH (64.0f)
-#define MIN_DEPTH (-10.0f)
-#define MAX_DEPTH (-1.0f)
-#define DEEPNESS (MAX_DEPTH - MIN_DEPTH)
+constexpr size_t MAX_SPRITES = 5000;
+constexpr float BOX_DIM = 10.0;
+constexpr float H_BOX_DIM = BOX_DIM / 2.0;
+constexpr float FLAKE_DIM = 0.05;
+constexpr float MAX_FLAKE_VEL = 0.005;
+constexpr float CAMERA_SPEED = 0.02;
 
-static int current_sprites = 1;
+static size_t current_sprites = 2000;
 static Spriteinfo sprites[MAX_SPRITES];
 
-inline glm::mat4x4 c2g(C3D_Mtx old) {
+inline glm::mat4x4 c2g(C3D_Mtx old)
+{
 	glm::mat4x4 n;
 	memcpy(glm::value_ptr(n), &old, sizeof old);
 	return n;
 }
-
 
 // Helper function for loading a texture from memory
 static bool loadTextureFromMem(C3D_Tex *tex, Tex3DS_Texture *t3x, C3D_TexCube *cube, const void *data, size_t size)
@@ -101,8 +102,7 @@ void set_rect(size_t index, glm::vec3 pos, float rotation, float width, float he
 		pos + (trans * glm::vec4(-w2, h2, 0, 1.0)).xyz(),
 		pos + (trans * glm::vec4(-w2, h2, 0, 1.0)).xyz(),
 		pos + (trans * glm::vec4(w2, -h2, 0, 1.0)).xyz(),
-		pos + (trans * glm::vec4(w2, h2, 0, 1.0)).xyz()
-	};
+		pos + (trans * glm::vec4(w2, h2, 0, 1.0)).xyz()};
 
 	memcpy(position_vbo + index, vertex_list, sizeof(vertex_list));
 }
@@ -115,8 +115,7 @@ void uv_rect(size_t index, const Tex3DS_SubTexture *ts)
 		glm::vec2(ts->left, ts->bottom),
 		glm::vec2(ts->left, ts->bottom),
 		glm::vec2(ts->right, ts->top),
-		glm::vec2(ts->right, ts->bottom)
-	};
+		glm::vec2(ts->right, ts->bottom)};
 
 	memcpy(uv_vbo + index, uvs, sizeof(uvs));
 }
@@ -144,21 +143,18 @@ static void sceneInit(void)
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
-	position_vbo = (glm::vec3*)linearAlloc(MAX_SPRITES * 6 * sizeof(glm::vec3));
-	uv_vbo = (glm::vec2*)linearAlloc(MAX_SPRITES * 6 * sizeof(glm::vec2));
+	position_vbo = (glm::vec3 *)linearAlloc(MAX_SPRITES * 6 * sizeof(glm::vec3));
+	uv_vbo = (glm::vec2 *)linearAlloc(MAX_SPRITES * 6 * sizeof(glm::vec2));
 
-	for (int i = 0; i < MAX_SPRITES; i++)
+	for (size_t i = 0; i < MAX_SPRITES; i++)
 	{
-		float width = 400 - SPRITE_WIDTH;
-		float height = 240 - SPRITE_HEIGHT;
-
-		glm::vec3 pos = {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH)};
-		Spriteinfo s = {pos, glm::vec2(randbetween(-2, 2), randbetween(-2, 2)), randbetween(0, M_2_PI), randbetween(-.03, .03), (size_t)randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
+		glm::vec3 pos = {randbetween(-H_BOX_DIM, H_BOX_DIM), randbetween(-H_BOX_DIM, H_BOX_DIM), randbetween(-H_BOX_DIM, H_BOX_DIM)};
+		Spriteinfo s = {pos, glm::vec2(randbetween(-MAX_FLAKE_VEL, MAX_FLAKE_VEL), randbetween(-MAX_FLAKE_VEL, MAX_FLAKE_VEL)), randbetween(0, M_2_PI), randbetween(-.03, .03), (size_t)randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
 		sprites[i] = s;
 
 		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, s.t3x_index);
 
-		set_rect(i * 6, pos, s.rotation, SPRITE_WIDTH, SPRITE_HEIGHT);
+		set_rect(i * 6, pos, s.rotation, FLAKE_DIM, FLAKE_DIM);
 		uv_rect(i * 6, ts);
 	}
 
@@ -186,18 +182,18 @@ static void sceneInit(void)
 static void update(float delta, float totaltime)
 {
 	delta *= 6.0 / 100.0;
-	for (int i = 0; i < current_sprites; i++)
+	for (size_t i = 0; i < current_sprites; i++)
 	{
 		Spriteinfo *s = &sprites[i];
 		s->pos += glm::vec3(s->velocity, 0) * delta;
 
-		set_rect(i * 6, s->pos, s->rotation, SPRITE_WIDTH, SPRITE_HEIGHT);
+		set_rect(i * 6, s->pos, s->rotation, FLAKE_DIM, FLAKE_DIM);
 
-		if (s->pos.x < 0 || s->pos.x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP)
+		if (s->pos.x < -H_BOX_DIM || s->pos.x + FLAKE_DIM > (float)H_BOX_DIM)
 		{
 			s->velocity.x *= -1;
 		}
-		if (s->pos.y < 0 || s->pos.y + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH)
+		if (s->pos.y < -H_BOX_DIM || s->pos.y + FLAKE_DIM > (float)H_BOX_DIM)
 		{
 			s->velocity.y *= -1;
 		}
@@ -208,12 +204,12 @@ static void update(float delta, float totaltime)
 
 static void sceneRender(float iod)
 {
-	Mtx_PerspStereoTilt(&projection, C3D_AngleFromDegrees(45.0f), C3D_AspectRatioTop, 0.0001f, 1000.0, iod, 2.0, false);
+	Mtx_PerspStereoTilt(&projection, C3D_AngleFromDegrees(45.0f), C3D_AspectRatioTop, 0.01f, 10.0, iod, 2.0, false);
 
 	C3D_Mtx view;
 	Mtx_Identity(&view);
 	Mtx_Translate(&view, -camera.x, -camera.y, -camera.z, true);
-	Mtx_Scale(&view, 1.0 / 400.0, 1.0 / 400.0, 1.0);
+	// Mtx_Scale(&view, 1.0 / 400.0, 1.0 / 400.0, 1.0);
 
 	Mtx_Multiply(&projection, &projection, &view);
 
@@ -292,17 +288,17 @@ int main()
 		// 	current_sprites = max(current_sprites - 100, 1);
 
 		if (kHeld & KEY_CPAD_UP)
-			camera.y += 0.1;
+			camera.y += CAMERA_SPEED;
 		if (kHeld & KEY_CPAD_DOWN)
-			camera.y -= 0.1;
+			camera.y -= CAMERA_SPEED;
 		if (kHeld & KEY_CPAD_LEFT)
-			camera.x -= 0.1;
+			camera.x -= CAMERA_SPEED;
 		if (kHeld & KEY_CPAD_RIGHT)
-			camera.x += 0.1;
+			camera.x += CAMERA_SPEED;
 		if (kHeld & KEY_A)
-			camera.z -= 0.1;
+			camera.z -= CAMERA_SPEED;
 		if (kHeld & KEY_B)
-			camera.z += 0.1;
+			camera.z += CAMERA_SPEED;
 
 		osTickCounterUpdate(&counter);
 		double frametime = osTickCounterRead(&counter);
