@@ -157,16 +157,13 @@ static void sceneInit(void)
 	AttrInfo_AddLoader(attrInfo, 0, GPU_FLOAT, 3);
 	AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
 
-	// Compute the projection matrix
-	// Mtx_OrthoTilt(&projection, 0, 400.0, 240, 0, 1000.0, -1000.0, true);
-
 	// Load the texture and bind it to the first texture unit
 	if (!loadTextureFromMem(&texture, &t3x, NULL, pixelflakes_t3x, pixelflakes_t3x_size))
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
-	position_vbo = linearAlloc(MAX_SPRITES * 6 * sizeof(vector3));
-	uv_vbo = linearAlloc(MAX_SPRITES * 6 * sizeof(vector2));
+	position_vbo = (vector3*)linearAlloc(MAX_SPRITES * 6 * sizeof(vector3));
+	uv_vbo = (vector2*)linearAlloc(MAX_SPRITES * 6 * sizeof(vector2));
 
 	for (int i = 0; i < MAX_SPRITES; i++)
 	{
@@ -196,7 +193,7 @@ static void sceneInit(void)
 	// See https://www.opengl.org/sdk/docs/man2/xhtml/glTexEnv.xml for more insight
 	C3D_TexEnv *env = C3D_GetTexEnv(0);
 	C3D_TexEnvInit(env);
-	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, 0);
+	C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PRIMARY_COLOR, GPU_PRIMARY_COLOR);
 	C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 
 	C3D_AlphaTest(true, GPU_EQUAL, 255);
