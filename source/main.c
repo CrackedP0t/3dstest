@@ -29,9 +29,9 @@ const int CLEAR_COLOR = 0x00000000;
 	 GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
 	 GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-typedef struct {float x; float y; float z; float u; float v;} vertex;
-typedef struct {float x; float y; float z; float velocity_x; float velocity_y; size_t t3x_index;} spriteinfo;
 typedef struct {float x; float y; float z; } vector3;
+typedef struct {vector3 pos; float u; float v;} vertex;
+typedef struct {vector3 pos; float velocity_x; float velocity_y; float rotation; float velocity_r; size_t t3x_index;} spriteinfo;
 
 static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
@@ -39,13 +39,13 @@ static int uLoc_projection;
 static int uLoc_tint;
 static C3D_Mtx projection;
 
-static vertex *vbo_data;
+static vertex *position_vbo;
 
 static C3D_Tex texture;
 static Tex3DS_Texture t3x;
 
 static vector3 player;
-static vector3 camera = {0.0, 0.0, 0.0};
+static vector3 camera = {0.5, 0.5, 0.0};
 
 #define MAX_SPRITES (1500)
 #define SPRITE_HEIGHT (64.0f)
@@ -57,10 +57,25 @@ static vector3 camera = {0.0, 0.0, 0.0};
 static int current_sprites = 1;
 static spriteinfo sprites[MAX_SPRITES];
 
+inline vector3 v34(C3D_FVec old) {
+	vector3 n = {old.x, old.y, old.z};
+	return n;
+}
+
+inline C3D_FVec v43(vector3 old) {
+	C3D_FVec n;
+	n.x = old.x;
+	n.y = old.y;
+	n.z = old.z;
+	n.w = 1.0;
+	return n;
+}
+
 // Helper function for loading a texture from memory
 static bool loadTextureFromMem(C3D_Tex *tex, Tex3DS_Texture *t3x, C3D_TexCube *cube, const void *data, size_t size)
 {
 	*t3x = Tex3DS_TextureImport(data, size, tex, cube, false);
+
 	if (!*t3x)
 		return false;
 
@@ -71,38 +86,34 @@ float randbetween(float min, float max) {
 	return (float)rand() / RAND_MAX * (max - min) + min;
 }
 
-void add_rect(vertex *dest, float x, float y, float z, float width, float height, const Tex3DS_SubTexture *ts) {
+void move_rect(vertex *dest, vector3 pos, float width, float height) {
+	dest[0].pos = pos;
+	dest[1].pos = pos;
+	dest[1].pos.x += width;
+	dest[2].pos = pos;
+	dest[2].pos.y += height;
+	dest[3].pos = pos;
+	dest[3].pos.y += height;
+	dest[4].pos = pos;
+	dest[4].pos.x += width;
+	dest[5].pos = pos;
+	dest[5].pos.x += width;
+	dest[5].pos.y += height;
+}
+
+void add_rect(vertex *dest, vector3 pos, float width, float height, const Tex3DS_SubTexture *ts) {
 	vertex vertex_list[] = {
-		{x, y, z, ts->left, ts->top},
-		{x + width, y, z, ts->right, ts->top},
-		{x, y + height, z, ts->left, ts->bottom},
-		{x, y + height, z, ts->left, ts->bottom},
-		{x + width, y, z, ts->right, ts->top},
-		{x + width, y + height, z, ts->right, ts->bottom},
+		{pos, ts->left, ts->top},
+		{pos, ts->right, ts->top},
+		{pos, ts->left, ts->bottom},
+		{pos, ts->left, ts->bottom},
+		{pos, ts->right, ts->top},
+		{pos, ts->right, ts->bottom},
 	};
 
 	memcpy(dest, vertex_list, sizeof(vertex_list));
-}
 
-void move_rect(vertex *dest, float x, float y, float z, float width, float height) {
-	dest[0].x = x;
-	dest[0].y = y;
-	dest[0].z = z;
-	dest[1].x = x + width;
-	dest[1].y = y;
-	dest[1].z = z;
-	dest[2].x = x;
-	dest[2].y = y + height;
-	dest[2].z = z;
-	dest[3].x = x;
-	dest[3].y = y + height;
-	dest[3].z = z;
-	dest[4].x = x + width;
-	dest[4].y = y;
-	dest[4].z = z;
-	dest[5].x = x + width;
-	dest[5].y = y + height;
-	dest[5].z = z;
+	move_rect(dest, pos, width, height);
 }
 
 void uv_rect(vertex *dest, const Tex3DS_SubTexture *ts) {
@@ -146,26 +157,26 @@ static void sceneInit(void)
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
-	vbo_data = linearAlloc(MAX_SPRITES * 6 * sizeof(vertex));
+	position_vbo = linearAlloc(MAX_SPRITES * 6 * sizeof(vertex));
 
 	for (int i = 0; i < MAX_SPRITES; i++) {
 		float width = 400 - SPRITE_WIDTH;
 		float height = 240 - SPRITE_HEIGHT;
 
-		spriteinfo s =  {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH), randbetween(-2, 2), randbetween(-2, 2),  randbetween(0, Tex3DS_GetNumSubTextures(t3x))};
+		vector3 pos = {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH)};
+		spriteinfo s =  {pos, randbetween(-2, 2), randbetween(-2, 2), 0, 0, randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
 		sprites[i] = s;
 		
 		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, s.t3x_index);
 
-		add_rect(&vbo_data[i * 6], s.x, s.y, s.z, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
+		add_rect(&position_vbo[i * 6], pos, SPRITE_WIDTH, SPRITE_HEIGHT, ts);
 	}
 
 	// Configure buffers
 	C3D_BufInfo *bufInfo = C3D_GetBufInfo();
 	BufInfo_Init(bufInfo);
-	BufInfo_Add(bufInfo, vbo_data, sizeof(vertex), 2, 0x10);
+	BufInfo_Add(bufInfo, position_vbo, sizeof(vertex), 2, 0x10);
 
-	// C3D_TexSetWrap(&texture, GPU_REPEAT, GPU_REPEAT);
 	C3D_TexSetFilter(&texture, GPU_NEAREST, GPU_NEAREST);
 	C3D_TexBind(0, &texture);
 	// Configure the first fragment shading substage to blend the texture color with
@@ -185,15 +196,15 @@ static void update(float delta) {
 	delta *= 6.0 / 100.0;
 	for (int i = 0; i < current_sprites; i++) {
 		spriteinfo *s = &sprites[i];
-		s->x += s->velocity_x * delta;
-		s->y += s->velocity_y * delta;
+		s->pos.x += s->velocity_x * delta;
+		s->pos.y += s->velocity_y * delta;
 
-		move_rect(&vbo_data[i * 6], s->x, s->y, s->z, SPRITE_WIDTH, SPRITE_HEIGHT);
+		move_rect(&position_vbo[i * 6], s->pos, SPRITE_WIDTH, SPRITE_HEIGHT);
 
-		if (s->x < 0 || s->x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP) {
+		if (s->pos.x < 0 || s->pos.x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP) {
 			s->velocity_x *= -1;
 		}
-		if (s->y < 0 || s->y + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH) {
+		if (s->pos.y < 0 || s->pos.y + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH) {
 			s->velocity_y *= -1;
 		}
 	}
@@ -224,7 +235,7 @@ static void sceneExit(void)
 	C3D_TexDelete(&texture);
 
 	// Free the VBO
-	linearFree(vbo_data);
+	linearFree(position_vbo);
 
 	// Free the shader program
 	shaderProgramFree(&program);
@@ -291,9 +302,9 @@ int main()
 		if (kHeld & KEY_CPAD_RIGHT)
 			camera.x += 0.1;
 		if (kHeld & KEY_A)
-			camera.z += 0.1;
-		if (kHeld & KEY_B)
 			camera.z -= 0.1;
+		if (kHeld & KEY_B)
+			camera.z += 0.1;
 
 		osTickCounterUpdate(&counter);
 		double frametime = osTickCounterRead(&counter);
@@ -317,7 +328,7 @@ int main()
 		printf("\x1b[4;1H   CmdBuf: %.2f%%\x1b[K", C3D_GetCmdBufUsage()*100.0f);
 		printf("\x1b[5;1HFrametime: %.2fms\x1b[K", frametime);
 		printf("\x1b[6;1H      FPS: %.2f\x1b[K", 1.0 / frametime * 1000.0);
-		printf("\x1b[7;1H   Camera: %f, %f, %f\x1b[K", camera.x, camera.y, camera.z);
+		printf("\x1b[7;1H   Camera: %.2f, %.2f, %.2f\x1b[K", camera.x, camera.y, camera.z);
 	}
 
 	// Deinitialize the scene
