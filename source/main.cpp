@@ -4,6 +4,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <chrono>
+#define GLM_MESSAGES
+#define GLM_FORCE_SWIZZLE
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/transform.hpp>
 #include "vshader_shbin.h"
 #include "pixelflakes_t3x.h"
 
@@ -28,26 +34,14 @@ const int CLEAR_COLOR = 0xff000000;
 	 GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | \
 	 GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
-typedef struct
-{
-	float x;
-	float y;
-	float z;
-} vector3;
-typedef struct
-{
-	float x;
-	float y;
-} vector2;
-typedef struct
-{
-	vector3 pos;
-	float velocity_x;
-	float velocity_y;
+struct Spriteinfo {
+	public:
+	glm::vec3 pos;
+	glm::vec2 velocity;
 	float rotation;
 	float velocity_r;
 	size_t t3x_index;
-} spriteinfo;
+};
 
 static DVLB_s *vshader_dvlb;
 static shaderProgram_s program;
@@ -55,12 +49,12 @@ static int uLoc_projection;
 static int uLoc_tint;
 static C3D_Mtx projection;
 
-static vector3 *position_vbo;
-static vector2 *uv_vbo;
+static glm::vec3 *position_vbo;
+static glm::vec2 *uv_vbo;
 static C3D_Tex texture;
 static Tex3DS_Texture t3x;
 
-static vector3 camera = {0.5, 0.5, 0.0};
+static glm::vec3 camera = {0.5, 0.5, 0.0};
 
 #define MAX_SPRITES (1500)
 #define SPRITE_HEIGHT (64.0f)
@@ -70,30 +64,14 @@ static vector3 camera = {0.5, 0.5, 0.0};
 #define DEEPNESS (MAX_DEPTH - MIN_DEPTH)
 
 static int current_sprites = 1;
-static spriteinfo sprites[MAX_SPRITES];
+static Spriteinfo sprites[MAX_SPRITES];
 
-inline vector3 v3(float x, float y, float z) 
-{
-	vector3 n = {x, y, z};
+inline glm::mat4x4 c2g(C3D_Mtx old) {
+	glm::mat4x4 n;
+	memcpy(glm::value_ptr(n), &old, sizeof old);
 	return n;
 }
 
-
-inline vector3 v34(C3D_FVec old)
-{
-	vector3 n = {old.x, old.y, old.z};
-	return n;
-}
-
-inline C3D_FVec v43(vector3 old)
-{
-	C3D_FVec n;
-	n.x = old.x;
-	n.y = old.y;
-	n.z = old.z;
-	n.w = 1.0;
-	return n;
-}
 
 // Helper function for loading a texture from memory
 static bool loadTextureFromMem(C3D_Tex *tex, Tex3DS_Texture *t3x, C3D_TexCube *cube, const void *data, size_t size)
@@ -111,15 +89,19 @@ float randbetween(float min, float max)
 	return (float)rand() / RAND_MAX * (max - min) + min;
 }
 
-void set_rect(size_t index, vector3 pos, float width, float height)
+void set_rect(size_t index, glm::vec3 pos, float rotation, float width, float height)
 {
-	vector3 vertex_list[] = {
-		pos,
-		{pos.x + width, pos.y, pos.z},
-		{pos.x, pos.y + height, pos.z},
-		{pos.x, pos.y + height, pos.z},
-		{pos.x + width, pos.y, pos.z},
-		{pos.x + width, pos.y + height, pos.z}
+	float w2 = width / 2;
+	float h2 = height / 2;
+
+	glm::mat4x4 trans = glm::rotate(rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::vec3 vertex_list[] = {
+		pos + (trans * glm::vec4(-w2, -h2, 0, 1.0)).xyz(),
+		pos + (trans * glm::vec4(w2, -h2, 0, 1.0)).xyz(),
+		pos + (trans * glm::vec4(-w2, h2, 0, 1.0)).xyz(),
+		pos + (trans * glm::vec4(-w2, h2, 0, 1.0)).xyz(),
+		pos + (trans * glm::vec4(w2, -h2, 0, 1.0)).xyz(),
+		pos + (trans * glm::vec4(w2, h2, 0, 1.0)).xyz()
 	};
 
 	memcpy(position_vbo + index, vertex_list, sizeof(vertex_list));
@@ -127,13 +109,13 @@ void set_rect(size_t index, vector3 pos, float width, float height)
 
 void uv_rect(size_t index, const Tex3DS_SubTexture *ts)
 {
-	vector2 uvs[] = {
-		{ts->left, ts->top},
-		{ts->right, ts->top},
-		{ts->left, ts->bottom},
-		{ts->left, ts->bottom},
-		{ts->right, ts->top},
-		{ts->right, ts->bottom}
+	glm::vec2 uvs[] = {
+		glm::vec2(ts->left, ts->top),
+		glm::vec2(ts->right, ts->top),
+		glm::vec2(ts->left, ts->bottom),
+		glm::vec2(ts->left, ts->bottom),
+		glm::vec2(ts->right, ts->top),
+		glm::vec2(ts->right, ts->bottom)
 	};
 
 	memcpy(uv_vbo + index, uvs, sizeof(uvs));
@@ -162,29 +144,29 @@ static void sceneInit(void)
 		svcBreak(USERBREAK_PANIC);
 
 	// Create the VBO (vertex buffer object)
-	position_vbo = (vector3*)linearAlloc(MAX_SPRITES * 6 * sizeof(vector3));
-	uv_vbo = (vector2*)linearAlloc(MAX_SPRITES * 6 * sizeof(vector2));
+	position_vbo = (glm::vec3*)linearAlloc(MAX_SPRITES * 6 * sizeof(glm::vec3));
+	uv_vbo = (glm::vec2*)linearAlloc(MAX_SPRITES * 6 * sizeof(glm::vec2));
 
 	for (int i = 0; i < MAX_SPRITES; i++)
 	{
 		float width = 400 - SPRITE_WIDTH;
 		float height = 240 - SPRITE_HEIGHT;
 
-		vector3 pos = {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH)};
-		spriteinfo s = {pos, randbetween(-2, 2), randbetween(-2, 2), 0, 0, randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
+		glm::vec3 pos = {randbetween(0, width), randbetween(0, height), randbetween(MIN_DEPTH, MAX_DEPTH)};
+		Spriteinfo s = {pos, glm::vec2(randbetween(-2, 2), randbetween(-2, 2)), randbetween(0, M_2_PI), randbetween(-.03, .03), (size_t)randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
 		sprites[i] = s;
 
 		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, s.t3x_index);
 
-		set_rect(i * 6, pos, SPRITE_WIDTH, SPRITE_HEIGHT);
+		set_rect(i * 6, pos, s.rotation, SPRITE_WIDTH, SPRITE_HEIGHT);
 		uv_rect(i * 6, ts);
 	}
 
 	// Configure buffers
 	C3D_BufInfo *bufInfo = C3D_GetBufInfo();
 	BufInfo_Init(bufInfo);
-	BufInfo_Add(bufInfo, position_vbo, sizeof(vector3), 1, 0x0);
-	BufInfo_Add(bufInfo, uv_vbo, sizeof(vector2), 1, 0x1);
+	BufInfo_Add(bufInfo, position_vbo, sizeof(glm::vec3), 1, 0x0);
+	BufInfo_Add(bufInfo, uv_vbo, sizeof(glm::vec2), 1, 0x1);
 
 	C3D_TexSetFilter(&texture, GPU_NEAREST, GPU_NEAREST);
 	C3D_TexBind(0, &texture);
@@ -201,25 +183,26 @@ static void sceneInit(void)
 	C3D_CullFace(GPU_CULL_NONE);
 }
 
-static void update(float delta)
+static void update(float delta, float totaltime)
 {
 	delta *= 6.0 / 100.0;
 	for (int i = 0; i < current_sprites; i++)
 	{
-		spriteinfo *s = &sprites[i];
-		s->pos.x += s->velocity_x * delta;
-		s->pos.y += s->velocity_y * delta;
+		Spriteinfo *s = &sprites[i];
+		s->pos += glm::vec3(s->velocity, 0) * delta;
 
-		set_rect(i * 6, s->pos, SPRITE_WIDTH, SPRITE_HEIGHT);
+		set_rect(i * 6, s->pos, s->rotation, SPRITE_WIDTH, SPRITE_HEIGHT);
 
 		if (s->pos.x < 0 || s->pos.x + SPRITE_WIDTH > (float)GSP_SCREEN_HEIGHT_TOP)
 		{
-			s->velocity_x *= -1;
+			s->velocity.x *= -1;
 		}
 		if (s->pos.y < 0 || s->pos.y + SPRITE_HEIGHT > (float)GSP_SCREEN_WIDTH)
 		{
-			s->velocity_y *= -1;
+			s->velocity.y *= -1;
 		}
+
+		s->rotation += delta * s->velocity_r;
 	}
 }
 
@@ -259,6 +242,8 @@ static bool paused = false;
 
 int main()
 {
+	auto start = std::chrono::system_clock::now();
+
 	srand(time(NULL));
 	// Initialize graphics
 	gfxInitDefault();
@@ -322,8 +307,10 @@ int main()
 		osTickCounterUpdate(&counter);
 		double frametime = osTickCounterRead(&counter);
 
+		float totaltime = std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(std::chrono::system_clock::now() - start).count();
+
 		if (!paused)
-			update(frametime);
+			update(frametime, totaltime);
 
 		C3D_RenderTargetClear(left_target, C3D_CLEAR_ALL, CLEAR_COLOR, 0);
 		C3D_FrameDrawOn(left_target);
@@ -343,6 +330,7 @@ int main()
 		printf("\x1b[5;1HFrametime: %.2fms\x1b[K", frametime);
 		printf("\x1b[6;1H      FPS: %.2f\x1b[K", 1.0 / frametime * 1000.0);
 		printf("\x1b[7;1H   Camera: %.2f, %.2f, %.2f\x1b[K", camera.x, camera.y, camera.z);
+		printf("\x1b[8;1H   Uptime: %.2fms\x1b[K", totaltime);
 	}
 
 	// Deinitialize the scene
