@@ -4,12 +4,15 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <iostream>
 #include <chrono>
 #define GLM_MESSAGES
 #define GLM_FORCE_SWIZZLE
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/io.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include "vshader_shbin.h"
 #include "pixelflakes_t3x.h"
 
@@ -39,7 +42,7 @@ struct Spriteinfo
 public:
 	glm::vec3 pos;
 	glm::vec2 velocity;
-	float rotation;
+	glm::quat rotation;
 	float velocity_r;
 	size_t t3x_index;
 };
@@ -55,14 +58,18 @@ static glm::vec2 *uv_vbo;
 static C3D_Tex texture;
 static Tex3DS_Texture t3x;
 
-static glm::vec3 camera = {0.5, 0.5, 0.0};
+static glm::vec3 camera_pos(0.5, 0.5, 0.0);
+static glm::quat camera_rot = glm::quat(1.0, 0.0, 0.0, 0.0);
 
 constexpr size_t MAX_SPRITES = 5000;
 constexpr float BOX_DIM = 10.0;
 constexpr float H_BOX_DIM = BOX_DIM / 2.0;
 constexpr float FLAKE_DIM = 0.05;
-constexpr float MAX_FLAKE_VEL = 0.005;
+constexpr float MAX_FLAKE_VEL = 0.004;
+constexpr float MAX_FLAKE_ROT = 0.01;
 constexpr float CAMERA_SPEED = 0.02;
+constexpr float CAMERA_ROT_SPEED = 0.02;
+constexpr float CPAD_MAX = 150.0;
 
 static size_t current_sprites = 2000;
 static Spriteinfo sprites[MAX_SPRITES];
@@ -71,6 +78,28 @@ inline glm::mat4x4 c2g(C3D_Mtx old)
 {
 	glm::mat4x4 n;
 	memcpy(glm::value_ptr(n), &old, sizeof old);
+	return n;
+}
+
+inline C3D_FVec g2c(glm::vec3 old)
+{
+	C3D_FVec n = FVec3_New(old.x, old.y, old.z);
+	return n;
+}
+
+inline C3D_FVec g2c(glm::vec4 old)
+{
+	C3D_FVec n = {old.x, old.y, old.z, old.w};
+	return n;
+}
+
+inline C3D_Mtx g2c(glm::mat4x4 old)
+{
+	C3D_Mtx n;
+	n.r[0] = g2c(glm::row(old, 0));
+	n.r[1] = g2c(glm::row(old, 1));
+	n.r[2] = g2c(glm::row(old, 2));
+	n.r[3] = g2c(glm::row(old, 3));
 	return n;
 }
 
@@ -90,12 +119,12 @@ float randbetween(float min, float max)
 	return (float)rand() / RAND_MAX * (max - min) + min;
 }
 
-void set_rect(size_t index, glm::vec3 pos, float rotation, float width, float height)
+void set_rect(size_t index, glm::vec3 pos, glm::quat rotation, float width, float height)
 {
 	float w2 = width / 2;
 	float h2 = height / 2;
 
-	glm::mat4x4 trans = glm::rotate(rotation, glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::mat4x4 trans = glm::toMat4(rotation);
 	glm::vec3 vertex_list[] = {
 		pos + (trans * glm::vec4(-w2, -h2, 0, 1.0)).xyz(),
 		pos + (trans * glm::vec4(w2, -h2, 0, 1.0)).xyz(),
@@ -149,7 +178,13 @@ static void sceneInit(void)
 	for (size_t i = 0; i < MAX_SPRITES; i++)
 	{
 		glm::vec3 pos = {randbetween(-H_BOX_DIM, H_BOX_DIM), randbetween(-H_BOX_DIM, H_BOX_DIM), randbetween(-H_BOX_DIM, H_BOX_DIM)};
-		Spriteinfo s = {pos, glm::vec2(randbetween(-MAX_FLAKE_VEL, MAX_FLAKE_VEL), randbetween(-MAX_FLAKE_VEL, MAX_FLAKE_VEL)), randbetween(0, M_2_PI), randbetween(-.03, .03), (size_t)randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)};
+		Spriteinfo s = {
+			pos,
+			glm::vec2(0, randbetween(-MAX_FLAKE_VEL, -.001)),
+			glm::quat(glm::vec3(randbetween(0, M_2_PI), randbetween(0, M_2_PI), randbetween(0, M_2_PI))),
+			randbetween(-MAX_FLAKE_ROT, MAX_FLAKE_ROT),
+			(size_t)randbetween(0, Tex3DS_GetNumSubTextures(t3x) - 1)
+		};
 		sprites[i] = s;
 
 		const Tex3DS_SubTexture *ts = Tex3DS_GetSubTexture(t3x, s.t3x_index);
@@ -189,16 +224,11 @@ static void update(float delta, float totaltime)
 
 		set_rect(i * 6, s->pos, s->rotation, FLAKE_DIM, FLAKE_DIM);
 
-		if (s->pos.x < -H_BOX_DIM || s->pos.x + FLAKE_DIM > (float)H_BOX_DIM)
+		if (s->pos.y < -H_BOX_DIM)
 		{
-			s->velocity.x *= -1;
+			s->pos.y = H_BOX_DIM;
 		}
-		if (s->pos.y < -H_BOX_DIM || s->pos.y + FLAKE_DIM > (float)H_BOX_DIM)
-		{
-			s->velocity.y *= -1;
-		}
-
-		s->rotation += delta * s->velocity_r;
+		// s->rotation += delta * s->velocity_r;
 	}
 }
 
@@ -206,11 +236,17 @@ static void sceneRender(float iod)
 {
 	Mtx_PerspStereoTilt(&projection, C3D_AngleFromDegrees(45.0f), C3D_AspectRatioTop, 0.01f, 10.0, iod, 2.0, false);
 
+	// glm::mat4x4 view = glm::mat4x4(1);
+	// view *= glm::translate(-camera_pos);
+	// view *= glm::toMat4(camera_rot);
 	C3D_Mtx view;
 	Mtx_Identity(&view);
-	Mtx_Translate(&view, -camera.x, -camera.y, -camera.z, true);
-	// Mtx_Scale(&view, 1.0 / 400.0, 1.0 / 400.0, 1.0);
-
+	Mtx_Translate(&view, -camera_pos.x, -camera_pos.y, -camera_pos.z, true);
+	Mtx_Rotate(&view, g2c(glm::axis(camera_rot)), glm::angle(camera_rot), true);
+	// C3D_Mtx rot_m;
+	// Mtx_FromQuat(&rot_m, camera_rot);
+	// Mtx_Multiply(&view, &rot_m, &view);
+	// C3D_Mtx g = g2c(view);
 	Mtx_Multiply(&projection, &projection, &view);
 
 	// Update the uniforms
@@ -287,18 +323,19 @@ int main()
 		// if (kDown & KEY_LEFT)
 		// 	current_sprites = max(current_sprites - 100, 1);
 
-		if (kHeld & KEY_CPAD_UP)
-			camera.y += CAMERA_SPEED;
-		if (kHeld & KEY_CPAD_DOWN)
-			camera.y -= CAMERA_SPEED;
-		if (kHeld & KEY_CPAD_LEFT)
-			camera.x -= CAMERA_SPEED;
-		if (kHeld & KEY_CPAD_RIGHT)
-			camera.x += CAMERA_SPEED;
+		circlePosition cpad;
+		hidCircleRead(&cpad);
+		glm::vec2 dir((float)cpad.dx, (float)cpad.dy);
+		dir = glm::clamp(dir, glm::vec2(-CPAD_MAX), glm::vec2(CPAD_MAX)) / CPAD_MAX;
+
+		camera_rot = glm::quat(glm::vec3(-dir.y * CAMERA_ROT_SPEED, 0.0, 0.0)) * camera_rot * glm::quat(glm::vec3(0.0, dir.x * CAMERA_ROT_SPEED, 0.0));
+		camera_rot = glm::normalize(camera_rot);
+		
 		if (kHeld & KEY_A)
-			camera.z -= CAMERA_SPEED;
-		if (kHeld & KEY_B)
-			camera.z += CAMERA_SPEED;
+			camera_pos += glm::vec3(0.0, 0.0, -CAMERA_SPEED) * -camera_rot;
+
+		// if (kHeld & KEY_B)
+		// 	camera_pos = glm::toMat4(camera_rot) * glm::translate(glm::vec3(0.0, 0.0, CAMERA_SPEED)) * glm::vec4(camera_pos, 1.0);
 
 		osTickCounterUpdate(&counter);
 		double frametime = osTickCounterRead(&counter);
@@ -325,8 +362,7 @@ int main()
 		printf("\x1b[4;1H   CmdBuf: %.2f%%\x1b[K", C3D_GetCmdBufUsage() * 100.0f);
 		printf("\x1b[5;1HFrametime: %.2fms\x1b[K", frametime);
 		printf("\x1b[6;1H      FPS: %.2f\x1b[K", 1.0 / frametime * 1000.0);
-		printf("\x1b[7;1H   Camera: %.2f, %.2f, %.2f\x1b[K", camera.x, camera.y, camera.z);
-		printf("\x1b[8;1H   Uptime: %.2fms\x1b[K", totaltime);
+		printf("\x1b[7;1H   Camera: %.2f, %.2f, %.2f\x1b[K", camera_pos.x, camera_pos.y, camera_pos.z);
 	}
 
 	// Deinitialize the scene
