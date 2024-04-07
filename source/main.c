@@ -236,6 +236,8 @@ static bool paused = false;
 
 int main()
 {
+	osSetSpeedupEnable(true);
+
 	srand(time(NULL));
 	// Initialize graphics
 	gfxInitDefault();
